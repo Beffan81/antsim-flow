@@ -1,0 +1,38 @@
+# FILE: antsim/config/examples/forage_gradient.yaml
+# Beispiel-Behavior-Tree für Step 13: Pheromon-Gradient-Navigation ohne Core-Änderungen.
+# Nutzung:
+#   python -m antsim --bt antsim/config/examples/forage_gradient.yaml
+#
+# Hinweis:
+# - Der bb_pheromone_gradient-Sensor wird automatisch durch den SensorsRunner ausgeführt.
+# - Der Trigger 'pheromone_gradient_available' akzeptiert einen Schwellwert (min_strength).
+# - Der Step 'follow_gradient' erzeugt Move-Intents; Mutation erfolgt ausschließlich im Executor.
+
+behavior_tree:
+  root:
+    type: selector
+    name: ForageRoot
+    children:
+      - type: sequence
+        name: FollowGradientPath
+        children:
+          - type: condition
+            name: GradientAvailable
+            condition:
+              # Demonstriert parametrisierten Trigger (min_strength)
+              triggers:
+                - name: pheromone_gradient_available
+                  params:
+                    min_strength: 0.1
+              logic: AND
+          - type: step
+            name: FollowGradientStep
+            step:
+              name: follow_gradient
+              params: {}
+      # Fallback, wenn kein Gradienten-Ziel vorhanden ist
+      - type: step
+        name: Idle
+        step:
+          name: example_wait
+          params: {}

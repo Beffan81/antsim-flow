@@ -3,7 +3,26 @@
  * Handles communication with the FastAPI backend running on localhost:8000
  */
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+// Auto-detect backend URL based on environment
+const getBackendUrl = () => {
+  // Check for environment variable first
+  if (typeof window !== 'undefined' && (window as any).__ANTSIM_BACKEND_URL__) {
+    return (window as any).__ANTSIM_BACKEND_URL__;
+  }
+  
+  // In GitHub Codespaces, use the forwarded port URL
+  if (typeof window !== 'undefined' && window.location.hostname.includes('app.github.dev')) {
+    // Extract the base domain and create backend URL
+    const hostname = window.location.hostname;
+    const backendHostname = hostname.replace('-5173', '-8000');
+    return `https://${backendHostname}`;
+  }
+  
+  // Default to localhost for local development
+  return 'http://127.0.0.1:8000';
+};
+
+const API_BASE_URL = getBackendUrl();
 
 export interface PluginsResponse {
   steps: string[];

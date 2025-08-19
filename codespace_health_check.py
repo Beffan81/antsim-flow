@@ -181,36 +181,39 @@ class HealthChecker:
         """Test complete simulation workflow"""
         print("\n=== 5. Simulation Workflow ===")
         
-        # Minimal simulation config
-        test_config = {
-            "simulation": {
-                "environment": {
-                    "width": 50,
-                    "height": 50,
-                    "entry_positions": [[25, 25]]
-                },
-                "agent": {
-                    "energy": 100,
-                    "max_energy": 100,
-                    "stomach_capacity": 50,
-                    "social_stomach_capacity": 50,
-                    "hunger_threshold": 30
-                },
-                "behavior_tree": {
-                    "root": {
-                        "type": "step",
-                        "name": "test_move",
-                        "step": {"name": "move", "params": {}}
-                    }
-                }
+        # Validation config format
+        validation_config = {
+            "environment": {
+                "width": 50,
+                "height": 50,
+                "entry_positions": [[25, 25]]
             },
+            "agent": {
+                "energy": 100,
+                "max_energy": 100,
+                "stomach_capacity": 50,
+                "social_stomach_capacity": 50,
+                "hunger_threshold": 30
+            },
+            "behavior_tree": {
+                "root": {
+                    "type": "step",
+                    "name": "test_move",
+                    "step": {"name": "move", "params": {}}
+                }
+            }
+        }
+        
+        # Start payload format (wraps validation config)
+        start_payload = {
+            "simulation": validation_config,
             "options": {"format": "json"}
         }
         
         try:
             # Validate config
             response = requests.post(f"{self.backend_url}/validate", 
-                                   json=test_config, timeout=10)
+                                   json=validation_config, timeout=10)
             if response.status_code == 200:
                 self.log("Config Validation", "PASS", "Config is valid")
             else:
@@ -219,7 +222,7 @@ class HealthChecker:
                 
             # Start simulation
             response = requests.post(f"{self.backend_url}/start", 
-                                   json=test_config, timeout=10)
+                                   json=start_payload, timeout=10)
             if response.status_code == 200:
                 result = response.json()
                 if result.get("ok") and "run_id" in result:

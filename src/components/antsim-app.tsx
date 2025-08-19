@@ -11,6 +11,7 @@ import { EnvironmentForm } from '@/components/environment-form';
 import { AgentForm } from '@/components/agent-form';
 import { BehaviorEditor } from '@/components/behavior-editor';
 import type { SimulationConfig } from '@/lib/api-client';
+import defaultBehaviorTree from '@/data/default-behavior.json';
 
 const AntsimApp = () => {
   const { toast } = useToast();
@@ -285,22 +286,7 @@ const AntsimApp = () => {
       ant_energy_reduction_rate: 1,
       queen_energy_reduction_rate: 1
     },
-    behavior_tree: {
-      root: {
-        type: "selector",
-        name: "Root",
-        children: [
-          {
-            type: "step",
-            name: "ExampleStep",
-            step: {
-              name: "example_wait",
-              params: {}
-            }
-          }
-        ]
-      }
-    }
+    behavior_tree: defaultBehaviorTree
   });
 
   // Connection test

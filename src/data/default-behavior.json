@@ -1,0 +1,45 @@
+{
+  "root": {
+    "type": "selector",
+    "name": "ForageRoot",
+    "children": [
+      {
+        "type": "sequence",
+        "name": "FollowGradientPath",
+        "children": [
+          {
+            "type": "condition",
+            "name": "GradientAvailable",
+            "condition": {
+              "triggers": [
+                {
+                  "name": "pheromone_gradient_available",
+                  "params": {
+                    "min_strength": 0.1
+                  }
+                }
+              ],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "step",
+            "name": "FollowGradientStep",
+            "step": {
+              "name": "follow_gradient",
+              "params": {}
+            }
+          }
+        ]
+      },
+      {
+        "type": "step",
+        "name": "IdleFallback",
+        "step": {
+          "name": "random_move",
+          "params": {}
+        }
+      }
+    ]
+  }
+}

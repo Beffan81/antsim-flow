@@ -78,7 +78,7 @@ class TestBackendAPI(unittest.TestCase):
                 "root": {
                     "type": "step",
                     "name": "test_move",
-                    "step": {"name": "move", "params": {}}
+                    "step": {"name": "random_move", "params": {}}
                 }
             }
         }
@@ -129,7 +129,7 @@ class TestBackendAPI(unittest.TestCase):
                     "root": {
                         "type": "step",
                         "name": "test_move",
-                        "step": {"name": "move", "params": {}}
+                        "step": {"name": "random_move", "params": {}}
                     }
                 }
             },

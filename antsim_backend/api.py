@@ -165,7 +165,11 @@ def get_status(run_id: str) -> Dict[str, Any]:
     Antwort: { state: "running"|"exited"|"error", exit_code?: number, pid?: number, error?: string }
     """
     try:
-        return _run_manager.get_status(run_id)
+        status = _run_manager.get_status(run_id)
+        if status.get("state") == "error" and "not found" in status.get("error", ""):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Run ID not found")
+        return status
     except Exception as e:
         log.error("Status error for %s: %s", run_id, e, exc_info=True)
         return {"state": "error", "error": str(e)}
@@ -178,7 +182,11 @@ def stop_run(run_id: str) -> Dict[str, Any]:
     Antwort: { ok: true, state: "exited"|"running", exit_code?: number, pid?: number } oder { ok: false, error }
     """
     try:
-        return _run_manager.stop_run(run_id)
+        result = _run_manager.stop_run(run_id)
+        if not result.get("ok") and "not found" in result.get("error", ""):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Run ID not found")
+        return result
     except Exception as e:
         log.error("Stop error for %s: %s", run_id, e, exc_info=True)
         return {"ok": False, "error": str(e)}

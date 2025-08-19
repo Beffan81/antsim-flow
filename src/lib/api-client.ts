@@ -45,21 +45,134 @@ export interface StopResponse {
   error?: string;
 }
 
+export interface EnvironmentConfig {
+  width: number;
+  height: number;
+  pheromone_evaporation_rate: number;
+  cell_size: number;
+  movement_directions: number[][];
+  spiral: {
+    max_steps: number;
+    directions: number[][];
+    spiral_steps_before_warning: number;
+    spiral_distance_increment_factor_range: number[];
+    spiral_max_directions: number;
+  };
+  search: {
+    max_distance: number;
+  };
+  entry_positions?: number[][];
+}
+
+export interface QueenConfig {
+  position: number[];
+  energy: number;
+  max_energy: number;
+  stomach_capacity: number;
+  pheromone_strength: number;
+  energy_increase_rate: number;
+  egg_laying_interval: number;
+  hunger_threshold: number;
+  hunger_pheromone_strength: number;
+  reduction_rate: number;
+  initial_energy_for_laying_eggs: number;
+  energy_after_laying_eggs: number;
+  stomach_depletion_rate: number;
+}
+
+export interface BroodConfig {
+  energy: number;
+  max_energy: number;
+  stomach_capacity: number;
+  social_stomach_capacity: number;
+  pheromone_strength: number;
+  reduction_rate: number;
+  hunger_threshold: number;
+  hunger_pheromone_strength: number;
+  energy_increase_rate: number;
+  stomach_depletion_rate: number;
+}
+
+export interface TaskConfig {
+  name: string;
+  priority: number;
+  steps: string[];
+  triggers: string[];
+  logic: string;
+  max_retries: number;
+  max_cycles?: number;
+  max_in_progress_per_step?: number;
+}
+
+export interface TriggerDefinition {
+  conditions: string[];
+  logic: string;
+}
+
+export interface DefaultAntConfig {
+  energy: number;
+  max_energy: number;
+  stomach_capacity: number;
+  social_stomach_capacity: number;
+  pheromone_strength: number;
+  reduction_rate: number;
+  hunger_threshold: number;
+  hunger_pheromone_strength: number;
+  energy_increase_rate: number;
+  stomach_depletion_rate: number;
+  behavior: {
+    max_spiral_steps: number;
+    search_distance: number;
+    spiral_max_directions: number;
+  };
+  steps_map: Record<string, string>;
+  triggers_definitions: Record<string, TriggerDefinition>;
+  tasks: TaskConfig[];
+}
+
+export interface AntsConfig {
+  num_ants: number;
+}
+
+export interface FoodSource {
+  position: number[];
+  amount: number;
+}
+
+export interface SimulationDisplayConfig {
+  screen_width: number;
+  screen_height: number;
+  cell_size: number;
+  colors: {
+    background: number[];
+    empty: number[];
+    wall: number[];
+    entry: number[];
+    queen: number[];
+    ant: number[];
+    food: number[];
+    pheromone: number[];
+    dashboard_background: number[];
+    text: number[];
+  };
+}
+
+export interface RatesConfig {
+  ant_energy_reduction_rate: number;
+  queen_energy_reduction_rate: number;
+}
+
 export interface SimulationConfig {
-  environment: {
-    width: number;
-    height: number;
-    entry_positions?: number[][];
-  };
-  agent: {
-    energy?: number;
-    max_energy?: number;
-    stomach_capacity?: number;
-    social_stomach_capacity?: number;
-    hunger_threshold?: number;
-  };
-  behavior_tree: {
-    root: any; // Will be defined more specifically in later steps
+  environment: EnvironmentConfig;
+  queen: QueenConfig;
+  brood: BroodConfig;
+  default_ant: DefaultAntConfig;
+  ants: AntsConfig;
+  food_sources: FoodSource[];
+  simulation: SimulationDisplayConfig;
+  rates: RatesConfig;
+  behavior_tree?: {
+    root: any;
   };
 }
 

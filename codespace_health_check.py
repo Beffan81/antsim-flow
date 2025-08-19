@@ -272,13 +272,14 @@ class HealthChecker:
                 stderr=subprocess.PIPE,
                 text=True
             )
-            time.sleep(5)  # Give it time to start or fail
+            time.sleep(10)  # Give it more time to start in Codespaces
             if process.poll() is None:  # Still running
                 self.log("Frontend Dev Server", "PASS", "Dev server can start")
                 process.terminate()
-                process.wait(timeout=5)
+                process.wait(timeout=10)
             else:
-                self.log("Frontend Dev Server", "FAIL", "Dev server failed to start")
+                _, stderr = process.communicate()
+                self.log("Frontend Dev Server", "FAIL", f"Dev server failed: {stderr[:100]}")
         except Exception as e:
             self.log("Frontend Dev Server", "FAIL", str(e))
 

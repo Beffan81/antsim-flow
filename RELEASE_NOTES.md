@@ -97,6 +97,7 @@ python antsim_test_runner.py
 - Simulation visualization is currently limited to basic status display
 - Some advanced pheromone features require additional configuration
 - Branch switching support is experimental
+- 3 moderate npm audit vulnerabilities in development dependencies (esbuild/vite) - development-only impact
 
 ## 🚧 What's Next
 

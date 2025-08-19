@@ -50,7 +50,7 @@ class TestE2EIntegration(unittest.TestCase):
     def test_default_ant_behavior_config(self):
         """Test the default ant behavior configuration from JSON"""
         
-        # Default configuration matching the provided JSON
+        # Default configuration with required behavior_tree
         default_config = {
             "simulation": {
                 "environment": {
@@ -68,6 +68,13 @@ class TestE2EIntegration(unittest.TestCase):
                     },
                     "search": {"max_distance": 20},
                     "entry_positions": [[25, 25]]
+                },
+                "behavior_tree": {
+                    "root": {
+                        "type": "step",
+                        "name": "default_behavior",
+                        "step": {"name": "random_move", "params": {}}
+                    }
                 },
                 "queen": {
                     "position": [25, 25],
@@ -223,7 +230,7 @@ class TestE2EIntegration(unittest.TestCase):
                     "root": {
                         "type": "step",
                         "name": "simple_move",
-                        "step": {"name": "move", "params": {}}
+                        "step": {"name": "random_move", "params": {}}
                     }
                 }
             },
@@ -264,7 +271,7 @@ class TestE2EIntegration(unittest.TestCase):
                     "root": {
                         "type": "step",
                         "name": "test_behavior",
-                        "step": {"name": "move", "params": {}}
+                        "step": {"name": "random_move", "params": {}}
                     }
                 }
             },
@@ -309,7 +316,7 @@ class TestE2EIntegration(unittest.TestCase):
                         "root": {
                             "type": "step",
                             "name": f"test_{i}",
-                            "step": {"name": "move", "params": {}}
+                            "step": {"name": "random_move", "params": {}}
                         }
                     }
                 },

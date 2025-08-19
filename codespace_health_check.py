@@ -145,7 +145,13 @@ class HealthChecker:
                     pass
                 time.sleep(1)
                 
-            self.log("Backend Start", "FAIL", "Backend failed to start within 30s")
+            # Capture stderr output to see what went wrong
+            if self.backend_process:
+                stdout, stderr = self.backend_process.communicate(timeout=5)
+                error_msg = f"Backend failed to start within 30s. Error: {stderr[:200] if stderr else 'No error output'}"
+            else:
+                error_msg = "Backend failed to start within 30s"
+            self.log("Backend Start", "FAIL", error_msg)
             return False
         except Exception as e:
             self.log("Backend Start", "FAIL", str(e))

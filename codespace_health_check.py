@@ -244,9 +244,11 @@ class HealthChecker:
                     else:
                         self.log("Simulation Stop", "FAIL", f"Status {stop_response.status_code}")
                 else:
-                    self.log("Simulation Start", "FAIL", "Invalid start response")
+                    # Debug: show actual response
+                    self.log("Simulation Start", "FAIL", f"Invalid response: {result}")
             else:
-                self.log("Simulation Start", "FAIL", f"Status {response.status_code}")
+                response_text = response.text[:200] if hasattr(response, 'text') else 'No response text'
+                self.log("Simulation Start", "FAIL", f"Status {response.status_code}: {response_text}")
                 
         except Exception as e:
             self.log("Simulation Workflow", "FAIL", str(e))

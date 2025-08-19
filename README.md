@@ -1,73 +1,65 @@
-# Welcome to your Lovable project
+# AntSim - Ant Colony Simulation Framework
 
-## Project info
+A modern, plugin-based ant colony simulation framework with React web interface.
 
-**URL**: https://lovable.dev/projects/496be90d-36f1-4edd-bb49-0747753d0758
+## Features
 
-## How can I edit this code?
+- **Ant Colony Simulation**: Plugin-based simulation engine with behavior trees
+- **Web Interface**: React frontend for configuration and visualization  
+- **Real-time Control**: Start/stop simulations via REST API
+- **Extensible**: Plugin system for custom behaviors, sensors, and triggers
 
-There are several ways of editing your application.
+## Quick Start
 
-**Use Lovable**
+### Prerequisites
+- Node.js 18+ (for frontend)
+- Python 3.8+ (for simulation engine)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/496be90d-36f1-4edd-bb49-0747753d0758) and start prompting.
+### Installation
+```bash
+# Install dependencies
+npm install
+pip install -r requirements.txt
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Setup antsim simulation
+python setup_antsim.py
 ```
 
-**Edit a file directly in GitHub**
+### Running
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+**Frontend & Backend:**
+```bash
+# Start frontend (port 5173)
+npm run dev
 
-**Use GitHub Codespaces**
+# Start backend API (port 8000)  
+python start_backend.py
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+**Simulation Only:**
+```bash
+# Run with default behavior tree
+python -m antsim
 
-## What technologies are used for this project?
+# Run with custom config
+python -m antsim --bt config/examples/forage_gradient.yaml
 
-This project is built with:
+# Run tests
+python antsim_test_runner.py
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## API Endpoints
 
-## How can I deploy this project?
+- `POST /start` - Start simulation
+- `GET /status` - Get simulation status  
+- `POST /stop` - Stop simulation
+- `GET /plugins` - List available plugins
 
-Simply open [Lovable](https://lovable.dev/projects/496be90d-36f1-4edd-bb49-0747753d0758) and click on Share -> Publish.
+API docs: http://localhost:8000/docs
 
-## Can I connect a custom domain to my Lovable project?
+## Architecture
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- **antsim/**: Core simulation engine
+- **antsim_backend/**: FastAPI REST backend
+- **src/**: React frontend
+- **config/**: Example behavior configurations

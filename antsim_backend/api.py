@@ -45,6 +45,31 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> Dict[str, Any]:
+    """
+    Backend API root endpoint - provides basic information and available endpoints.
+    """
+    return {
+        "name": "antsim backend",
+        "version": "0.2.0",
+        "status": "running",
+        "endpoints": {
+            "GET /": "This info page",
+            "GET /docs": "OpenAPI documentation",
+            "GET /plugins": "List available plugins",
+            "POST /validate": "Validate simulation config",
+            "POST /start": "Start simulation",
+            "GET /status/{run_id}": "Get simulation status", 
+            "POST /stop/{run_id}": "Stop simulation"
+        },
+        "usage": {
+            "docs": "Visit /docs for interactive API documentation",
+            "frontend": "Use the React frontend for visual interface"
+        }
+    }
+
+
 @app.get("/plugins")
 def get_plugins() -> Dict[str, List[str]]:
     """

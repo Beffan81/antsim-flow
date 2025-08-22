@@ -28,7 +28,7 @@ npm run dev
 - **Frontend UI**: http://127.0.0.1:5173
 - **API Dokumentation**: http://127.0.0.1:8000/docs
 
-## 🧪 Test-Workflows (Optimierte Reihenfolge)
+## 🧪 Test-Workflows
 
 ### Ersteinrichtung (einmalig, nach Git-Clone)
 ```bash

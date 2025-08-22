@@ -1,15 +1,106 @@
 {
+  "name": "ComprehensiveAntBehavior",
+  "description": "Comprehensive behavior tree handling hunger signaling, feeding, and foraging",
   "root": {
     "type": "selector",
-    "name": "ForageRoot",
+    "name": "ComprehensiveRoot",
     "children": [
       {
         "type": "sequence",
-        "name": "FollowGradientPath",
+        "name": "HungryAntSequence",
         "children": [
           {
             "type": "condition",
-            "name": "GradientAvailable",
+            "name": "CheckIndividualHungry",
+            "condition": {
+              "triggers": [
+                {
+                  "name": "individual_hungry",
+                  "params": {}
+                }
+              ],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "step",
+            "name": "ExploreNestWhenHungry",
+            "step": {
+              "name": "explore_nest",
+              "params": {}
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "FeedingSequence",
+        "children": [
+          {
+            "type": "condition",
+            "name": "CheckCanFeedNeighbor",
+            "condition": {
+              "triggers": [
+                {
+                  "name": "not_social_hungry",
+                  "params": {}
+                },
+                {
+                  "name": "signaling_neighbor_found",
+                  "params": {}
+                }
+              ],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "step",
+            "name": "FeedHungryNeighbor",
+            "step": {
+              "name": "feed_neighbor",
+              "params": {}
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "SocialFeederInNestSequence",
+        "children": [
+          {
+            "type": "condition",
+            "name": "CheckFeederInNest",
+            "condition": {
+              "triggers": [
+                {
+                  "name": "not_social_hungry",
+                  "params": {}
+                },
+                {
+                  "name": "in_nest",
+                  "params": {}
+                }
+              ],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "step",
+            "name": "ExploreNestAsFeeder",
+            "step": {
+              "name": "explore_nest",
+              "params": {}
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "ForagingSequence",
+        "children": [
+          {
+            "type": "condition",
+            "name": "CheckGradientAvailable",
             "condition": {
               "triggers": [
                 {
@@ -24,7 +115,7 @@
           },
           {
             "type": "step",
-            "name": "FollowGradientStep",
+            "name": "FollowPheromoneGradient",
             "step": {
               "name": "follow_gradient",
               "params": {}
@@ -34,7 +125,7 @@
       },
       {
         "type": "step",
-        "name": "IdleFallback",
+        "name": "RandomMoveFallback",
         "step": {
           "name": "random_move",
           "params": {}

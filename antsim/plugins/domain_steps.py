@@ -394,13 +394,18 @@ def feed_neighbor_step(worker: Any, environment: Any, amount: Optional[int] = No
     """
     Feed a hungry neighboring worker using social stomach content.
     Pure step: reads BB, emits a FeedIntent; no world mutation here.
+    
+    Supports both regular hungry neighbors and signaling neighbors (hungry + in nest).
+    Prioritizes signaling neighbors over regular hungry neighbors.
 
-    Preconditions (from BB):
-    - 'hungry_neighbor_id' present (int)
-    - 'social_stomach' > 0
+    Returns FAILURE when no target available or social stomach empty.
     """
     wid = getattr(worker, "id", "?")
-    target_id = _bb_get(worker, "hungry_neighbor_id", None)
+    # Check for signaling neighbor first (prioritized)
+    target_id = _bb_get(worker, "signaling_neighbor_id", None)
+    # Fallback to regular hungry neighbor
+    if target_id is None:
+        target_id = _bb_get(worker, "hungry_neighbor_id", None)
     social = _bb_get(worker, "social_stomach", 0)
 
     if target_id is None:

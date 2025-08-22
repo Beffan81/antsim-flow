@@ -1,0 +1,104 @@
+# Hunger Signaling MVP Configuration
+# Demonstrates blackboard-flag based hunger communication between ants
+
+# Environment setup - simple nest with entry
+environment:
+  width: 20
+  height: 20
+  grid_file: null
+  entry_positions: [[10, 10]]
+  nest_cells:
+    - [8, 8, 12, 12]  # Simple rectangular nest area
+
+# Agent configuration
+agent:
+  count: 8
+  energy: 100
+  max_energy: 100
+  individual_stomach_capacity: 50
+  social_stomach_capacity: 30
+  hunger_threshold: 20  # Hungry when individual_stomach < 20
+  initial_individual_stomach: 15  # Start some ants hungry
+  initial_social_stomach: 25      # Start with social food
+
+# Sensors - all needed for MVP
+sensors:
+  - name: "bb_basic_state"
+  - name: "bb_env_flags" 
+  - name: "bb_neighbors"
+  - name: "bb_internal_state"
+
+# Simple behavior trees for MVP demonstration
+behavior_trees:
+  # Hungry ant behavior: move randomly in nest to find feeders
+  hungry_ant:
+    type: "selector"
+    name: "HungryAntBehavior"
+    children:
+      - type: "sequence"
+        name: "SignalHungerInNest"
+        children:
+          - type: "condition"
+            name: "CheckIndividualHungry"
+            condition:
+              triggers:
+                - name: "individual_hungry"
+              logic: "AND"
+          - type: "step"
+            name: "ExploreNest"
+            step:
+              name: "explore_nest"
+              params: {}
+      - type: "step"
+        name: "DefaultMove"
+        step:
+          name: "random_move"
+          params: {}
+
+  # Feeder ant behavior: feed signaling neighbors when possible
+  feeder_ant:
+    type: "selector"
+    name: "FeederAntBehavior" 
+    children:
+      - type: "sequence"
+        name: "FeedSignalingNeighbor"
+        children:
+          - type: "condition"
+            name: "CheckCanFeed"
+            condition:
+              triggers:
+                - name: "not_social_hungry"
+                - name: "signaling_neighbor_found"
+              logic: "AND"
+          - type: "step"
+            name: "FeedNeighbor"
+            step:
+              name: "feed_neighbor"
+              params: {}
+      - type: "step"
+        name: "DefaultMove"
+        step:
+          name: "random_move"
+          params: {}
+
+# Assign behavior trees to agents
+agent_behavior_mapping:
+  # Alternate between hungry and feeder behaviors
+  default: "hungry_ant"
+  overrides:
+    0: "feeder_ant"
+    2: "feeder_ant" 
+    4: "feeder_ant"
+    6: "feeder_ant"
+
+# Simulation parameters
+simulation:
+  max_cycles: 100
+  log_level: "INFO"
+  
+# Food sources for testing (optional)
+food_sources:
+  - position: [5, 5]
+    amount: 100
+  - position: [15, 15] 
+    amount: 100

@@ -87,15 +87,22 @@ def bb_neighbors_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
             "hungry_neighbor_id": None,
             "hungry_neighbor_position": None,
             "neighbor_with_food_found": False,
+            "signaling_neighbor_found": False,
+            "signaling_neighbor_id": None,
+            "signaling_neighbor_position": None,
         }
     x, y = _safe_pos(worker)
     hungry_neighbor_id = None
     hungry_neighbor_pos = None
     hungry_found = False
+    signaling_neighbor_id = None
+    signaling_neighbor_pos = None
+    signaling_found = False
     neighbor_with_food = False
     dirs8 = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
     dirs4 = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     best_hunger_ratio = 1.1
+    best_signaling_ratio = 1.1
     for dx, dy in dirs8:
         nx, ny = x + dx, y + dy
         ant = environment.get_ant_at_position(nx, ny)
@@ -103,10 +110,12 @@ def bb_neighbors_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
             continue
         indiv_stomach = None
         hunger_thr = None
+        in_nest = False
         bb = getattr(ant, "blackboard", None)
         if bb:
             indiv_stomach = bb.get("individual_stomach")
             hunger_thr = bb.get("hunger_threshold")
+            in_nest = bb.get("in_nest", False)
         if indiv_stomach is None:
             indiv_stomach = getattr(ant, "current_stomach", None)
         if hunger_thr is None:
@@ -114,11 +123,20 @@ def bb_neighbors_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
         if indiv_stomach is None or hunger_thr in (None, 0):
             continue
         ratio = float(indiv_stomach) / float(hunger_thr)
+        
+        # Check for individual hungry neighbor (existing logic)
         if indiv_stomach < hunger_thr and ratio < best_hunger_ratio:
             best_hunger_ratio = ratio
             hungry_neighbor_id = getattr(ant, "id", None)
             hungry_neighbor_pos = [nx, ny]
             hungry_found = True
+            
+        # Check for signaling neighbor (hungry AND in nest)
+        if indiv_stomach < hunger_thr and in_nest and ratio < best_signaling_ratio:
+            best_signaling_ratio = ratio
+            signaling_neighbor_id = getattr(ant, "id", None)
+            signaling_neighbor_pos = [nx, ny]
+            signaling_found = True
     for dx, dy in dirs4:
         nx, ny = x + dx, y + dy
         ant = environment.get_ant_at_position(nx, ny)
@@ -134,14 +152,17 @@ def bb_neighbors_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
             neighbor_with_food = True
             break
     logger.debug(
-        "sensor=bb_neighbors hungry_found=%s hungry_id=%s hungry_pos=%s neighbor_with_food=%s",
-        hungry_found, hungry_neighbor_id, hungry_neighbor_pos, neighbor_with_food,
+        "sensor=bb_neighbors hungry_found=%s hungry_id=%s hungry_pos=%s neighbor_with_food=%s signaling_found=%s signaling_id=%s",
+        hungry_found, hungry_neighbor_id, hungry_neighbor_pos, neighbor_with_food, signaling_found, signaling_neighbor_id,
     )
     return {
         "individual_hungry_neighbor_found": hungry_found,
         "hungry_neighbor_id": hungry_neighbor_id,
         "hungry_neighbor_position": hungry_neighbor_pos,
         "neighbor_with_food_found": neighbor_with_food,
+        "signaling_neighbor_found": signaling_found,
+        "signaling_neighbor_id": signaling_neighbor_id,
+        "signaling_neighbor_position": signaling_neighbor_pos,
     }
 
 
@@ -315,6 +336,10 @@ def bb_internal_state_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
     has_moved = g("has_moved", False)
     food_detected = g("food_detected", False)
     search_unsuccessful = not has_moved and not food_detected
+    
+    # NEW: Derive signaling_hunger from individual_hungry AND in_nest
+    in_nest = g("in_nest", False)
+    signaling_hunger = individual_hungry and in_nest
 
     out = {
         "energy": int(energy),
@@ -327,9 +352,10 @@ def bb_internal_state_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
         "individual_hungry": individual_hungry,
         "social_hungry": social_hungry,
         "search_unsuccessful": search_unsuccessful,  # NEW
+        "signaling_hunger": signaling_hunger,  # NEW
     }
     logger.debug(
-        "sensor=bb_internal_state indiv=%s/%s social=%s/%s threshold=%s hungry_i=%s hungry_s=%s search_fail=%s",
-        indiv, indiv_cap, social, social_cap, thr, individual_hungry, social_hungry, search_unsuccessful
+        "sensor=bb_internal_state indiv=%s/%s social=%s/%s threshold=%s hungry_i=%s hungry_s=%s search_fail=%s signaling=%s",
+        indiv, indiv_cap, social, social_cap, thr, individual_hungry, social_hungry, search_unsuccessful, signaling_hunger
     )
     return out

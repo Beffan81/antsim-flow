@@ -1,0 +1,60 @@
+{
+  "name": "HungerSignalingMVP",
+  "description": "Hunger signaling behavior tree for MVP demonstration",
+  "root": {
+    "type": "selector",
+    "id": "root",
+    "name": "RootBehavior",
+    "children": [
+      {
+        "type": "sequence",
+        "id": "hunger_sequence",
+        "name": "HungerSignalingSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_hungry",
+            "name": "CheckIndividualHungry",
+            "triggers": ["individual_hungry"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "explore_nest",
+            "name": "ExploreNest",
+            "stepName": "explore_nest",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "id": "feeding_sequence", 
+        "name": "FeedingSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_can_feed",
+            "name": "CheckCanFeed",
+            "triggers": ["not_social_hungry", "signaling_neighbor_found"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "feed_neighbor",
+            "name": "FeedNeighbor",
+            "stepName": "feed_neighbor",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "step",
+        "id": "default_move",
+        "name": "DefaultMove",
+        "stepName": "random_move",
+        "params": {}
+      }
+    ]
+  }
+}

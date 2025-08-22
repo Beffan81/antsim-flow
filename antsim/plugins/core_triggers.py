@@ -48,6 +48,9 @@ def register_triggers() -> Dict[str, callable]:
         "food_detected": food_detected,
         "individual_hungry_neighbor_found": hungry_neighbor_found,
         "neighbor_with_food_found": neighbor_with_food_found,
+        # NEW: signaling triggers
+        "signaling_neighbor_found": signaling_neighbor_found,
+        "signaling_hunger": signaling_hunger,
         # legacy/domain parity additions
         "queen_pheromone_detected": queen_pheromone_detected,
         # Provide both canonical and legacy-cased names for unsuccessful search
@@ -133,6 +136,18 @@ def search_for_food_unsuccessful(bb: Any) -> bool:
     """
     v = bool(_get(bb, "search_unsuccessful", False))
     return _log("search_for_food_unsuccessful", v)
+
+
+# Signaling triggers
+def signaling_neighbor_found(bb: Any) -> bool:
+    """True if a signaling (hungry + in nest) neighbor has been detected."""
+    v = bool(_get(bb, "signaling_neighbor_found", False))
+    return _log("signaling_neighbor_found", v, signaling_id=_get(bb, "signaling_neighbor_id"))
+
+def signaling_hunger(bb: Any) -> bool:
+    """True if this ant is signaling hunger (individual_hungry AND in_nest).""" 
+    v = bool(_get(bb, "signaling_hunger", False))
+    return _log("signaling_hunger", v, individual_hungry=_get(bb, "individual_hungry"), in_nest=_get(bb, "in_nest"))
 
 
 # Generic helper triggers

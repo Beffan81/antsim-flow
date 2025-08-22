@@ -206,7 +206,7 @@ def _load_bt_root(pm: PluginManager, argv: List[str]):
     return load_behavior_tree(pm, BT_CONFIG_JSON)
 
 
-def run_demo(ticks: int = 3) -> None:
+def run_demo(ticks: int = 100) -> None:
     """Führt eine kurze Demo der neuen Pipeline aus (BT aus validierter Config) und rendert mit dem neuen Renderer."""
     log = logging.getLogger(__name__)
     log.info("=== Neue Core-Demo startet ===")
@@ -339,7 +339,7 @@ def main():
         enabled_types=None  # None = alle EventType
     )
 
-    run_demo(ticks=5)
+    run_demo(ticks=100)
 
 
 if __name__ == "__main__":

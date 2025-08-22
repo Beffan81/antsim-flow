@@ -35,6 +35,8 @@ class RunRecord:
     format: str
     created_at: float = field(default_factory=lambda: time.time())
     error: Optional[str] = None
+    stdout_path: Optional[str] = None
+    stderr_path: Optional[str] = None
 
 
 class RunManager:
@@ -103,6 +105,15 @@ class RunManager:
         env = os.environ.copy()
         # Unbuffered stdout for immediate logs (optional)
         env.setdefault("PYTHONUNBUFFERED", "1")
+        # Ensure DISPLAY is properly set for pygame
+        if "DISPLAY" in os.environ:
+            env["DISPLAY"] = os.environ["DISPLAY"]
+        
+        # Create log files for capturing subprocess output
+        import tempfile
+        stdout_file = tempfile.NamedTemporaryFile(mode='w+', prefix=f'antsim_stdout_{uuid.uuid4().hex[:8]}_', suffix='.log', delete=False)
+        stderr_file = tempfile.NamedTemporaryFile(mode='w+', prefix=f'antsim_stderr_{uuid.uuid4().hex[:8]}_', suffix='.log', delete=False)
+        
         try:
             import subprocess
             # Separate process group for better termination handling
@@ -111,13 +122,14 @@ class RunManager:
             if os.name == "nt":
                 creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
             else:
-                preexec_fn = os.setsid  # new session
+                # Don't create new session to preserve display connection
+                preexec_fn = None  # Keep display access
             proc = subprocess.Popen(
                 cmd,
                 env=env,
-                stdout=None,
-                stderr=None,
-                stdin=None,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                stdin=subprocess.DEVNULL,
                 creationflags=creationflags,
                 preexec_fn=preexec_fn,
             )
@@ -130,11 +142,19 @@ class RunManager:
 
         run_id = uuid.uuid4().hex
         rec = RunRecord(run_id=run_id, pid=proc.pid, process=proc, config_path=cfg_path, format=fmt)
+        # Store log file paths for error reporting
+        rec.stdout_path = stdout_file.name
+        rec.stderr_path = stderr_file.name
+        stdout_file.close()
+        stderr_file.close()
+        
         with self._lock:
             self._runs[run_id] = rec
 
-        log.info("Started antsim run_id=%s pid=%s cfg=%s", run_id, proc.pid, cfg_path)
-        return {"run_id": run_id, "pid": proc.pid, "config_path": str(cfg_path)}
+        log.info("Started antsim run_id=%s pid=%s cfg=%s stdout=%s stderr=%s", 
+                run_id, proc.pid, cfg_path, rec.stdout_path, rec.stderr_path)
+        return {"run_id": run_id, "pid": proc.pid, "config_path": str(cfg_path), 
+                "stdout_log": rec.stdout_path, "stderr_log": rec.stderr_path}
 
     def get_status(self, run_id: str) -> Dict[str, Any]:
         with self._lock:
@@ -145,11 +165,40 @@ class RunManager:
         if proc is None:
             return {"state": "error", "error": rec.error or "process not available"}
         code = proc.poll()
+        
+        # Read recent output for debugging
+        recent_stdout = ""
+        recent_stderr = ""
+        if rec.stdout_path and os.path.exists(rec.stdout_path):
+            try:
+                with open(rec.stdout_path, 'r') as f:
+                    lines = f.readlines()
+                    recent_stdout = ''.join(lines[-10:])  # Last 10 lines
+            except Exception:
+                pass
+        if rec.stderr_path and os.path.exists(rec.stderr_path):
+            try:
+                with open(rec.stderr_path, 'r') as f:
+                    lines = f.readlines()
+                    recent_stderr = ''.join(lines[-10:])  # Last 10 lines
+            except Exception:
+                pass
+        
+        result = {
+            "pid": proc.pid,
+            "stdout_log": rec.stdout_path,
+            "stderr_log": rec.stderr_path,
+            "recent_stdout": recent_stdout.strip(),
+            "recent_stderr": recent_stderr.strip()
+        }
+        
         if code is None:
             # Running
-            return {"state": "running", "pid": proc.pid}
+            result["state"] = "running"
+            return result
         # Exited
-        return {"state": "exited", "exit_code": int(code), "pid": proc.pid}
+        result.update({"state": "exited", "exit_code": int(code)})
+        return result
 
     def stop_run(self, run_id: str, timeout: float = 5.0) -> Dict[str, Any]:
         with self._lock:

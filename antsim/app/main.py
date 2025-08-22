@@ -251,7 +251,7 @@ def run_demo(ticks: int = 100) -> None:
         _HAS_PYGAME = False
     
     # Konfigurierbare Delays aus Environment-Variablen
-    tick_delay = float(os.environ.get("ANTSIM_TICK_DELAY", "0.1"))
+    tick_delay = float(os.environ.get("ANTSIM_TICK_DELAY", "1.0"))
     window_hold = float(os.environ.get("ANTSIM_WINDOW_HOLD", "5.0"))
     log.info("Simulation läuft mit tick_delay=%.2fs, window_hold=%.2fs", tick_delay, window_hold)
 

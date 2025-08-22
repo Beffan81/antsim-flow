@@ -20,6 +20,7 @@ Erweitert: Konfiguration des EventLogger (strukturierte Ereignisse, Auto-Flush),
 import logging
 import os
 import sys
+import time
 from typing import Any, Dict, Optional, List, Tuple
 
 from ..registry.manager import PluginManager
@@ -237,15 +238,22 @@ def run_demo(ticks: int = 100) -> None:
     engine = BehaviorEngine(pm, root)
     renderer = Renderer(cell_size=24, show_grid=False, show_pheromones=True)
     # Fenster initialisieren (tolerant, wenn pygame fehlt)
+    log.info("Initialisiere Pygame-Fenster...")
     renderer.init_window(env.width, env.height, dashboard_width=0, title="antsim new core")
+    log.info("Pygame-Fenster erstellt, starte Simulation")
 
-    # 5) Tick-Schleife
+    # 5) Tick-Schleife mit konfigurierbarer Geschwindigkeit
     # Optional: Pygame-Events verarbeiten, wenn verfügbar
     try:
         import pygame  # type: ignore
         _HAS_PYGAME = True
     except Exception:
         _HAS_PYGAME = False
+    
+    # Konfigurierbare Delays aus Environment-Variablen
+    tick_delay = float(os.environ.get("ANTSIM_TICK_DELAY", "0.1"))
+    window_hold = float(os.environ.get("ANTSIM_WINDOW_HOLD", "5.0"))
+    log.info("Simulation läuft mit tick_delay=%.2fs, window_hold=%.2fs", tick_delay, window_hold)
 
     for t in range(1, ticks + 1):
         env.cycle_count = t
@@ -290,8 +298,31 @@ def run_demo(ticks: int = 100) -> None:
             get_event_logger().flush()
         except Exception:
             pass
+        
+        # Simulation verlangsamen für bessere Beobachtbarkeit
+        if tick_delay > 0:
+            time.sleep(tick_delay)
 
     log.info("=== Demo abgeschlossen ===")
+    
+    # Fenster offen halten für bessere Beobachtbarkeit
+    if window_hold > 0 and _HAS_PYGAME:
+        log.info("Halte Fenster für %.1f Sekunden offen (ESC oder Fenster schließen zum Beenden)", window_hold)
+        start_time = time.time()
+        while time.time() - start_time < window_hold:
+            try:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                        log.info("Vorzeitiges Beenden durch Benutzer")
+                        break
+                else:
+                    time.sleep(0.1)  # Kurze Pause um CPU zu schonen
+                    continue
+                break  # Aus der while-Schleife wenn break aus for-Schleife
+            except Exception:
+                # Defensive: Events dürfen nicht crashen
+                time.sleep(0.1)
+    
     # Abschließender Flush
     try:
         get_event_logger().flush()

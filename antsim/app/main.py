@@ -370,7 +370,10 @@ def main():
         enabled_types=None  # None = alle EventType
     )
 
-    run_demo(ticks=100)
+    # Konfigurierbare Tick-Anzahl aus Environment-Variable
+    ticks = int(os.environ.get("ANTSIM_TICKS", "10000"))
+    log.info("Simulation startet mit %d Ticks (konfigurierbar via ANTSIM_TICKS)", ticks)
+    run_demo(ticks=ticks)
 
 
 if __name__ == "__main__":

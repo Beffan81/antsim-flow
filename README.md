@@ -25,7 +25,7 @@ npm run dev
 
 ### 3. Zugriff auf die Anwendung
 - **Backend API**: http://127.0.0.1:8000
-- **Frontend UI**: http://127.0.0.1:5173
+- **Frontend UI**: http://127.0.0.1:8080
 - **API Dokumentation**: http://127.0.0.1:8000/docs
 
 ## 🧪 Test-Workflows

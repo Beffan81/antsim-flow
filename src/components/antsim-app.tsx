@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Settings, Brain, Play, CheckCircle, AlertCircle, Server } from 'lucide-react';
 import { usePlugins, useValidateConfig, useStartSimulation, useTestConnection } from '@/hooks/use-api';
 import { useToast } from '@/hooks/use-toast';
+import { usePersistedBehaviorTree } from '@/hooks/use-persisted-behavior-tree';
 import { EnvironmentForm } from '@/components/environment-form';
 import { AgentForm } from '@/components/agent-form';
 import { BehaviorEditor } from '@/components/behavior-editor';
@@ -22,6 +23,9 @@ const AntsimApp = () => {
   const validateConfig = useValidateConfig();
   const startSimulation = useStartSimulation();
   const testConnection = useTestConnection();
+  
+  // Persisted behavior tree hook
+  const { tree: behaviorTree, saveTree, resetToDefault, exportTree, importTree, isLoaded } = usePersistedBehaviorTree(defaultBehaviorTree);
 
   // Initialize default configuration from provided JSON
   const [config, setConfig] = useState<SimulationConfig>({
@@ -286,7 +290,7 @@ const AntsimApp = () => {
       ant_energy_reduction_rate: 1,
       queen_energy_reduction_rate: 1
     },
-    behavior_tree: defaultBehaviorTree
+    behavior_tree: behaviorTree
   });
 
   // Connection test
@@ -465,9 +469,13 @@ const AntsimApp = () => {
 
           <TabsContent value="behavior">
             <BehaviorEditor 
-              tree={config.behavior_tree || { root: null }}
-              onChange={(tree) => setConfig({...config, behavior_tree: tree})}
+              tree={behaviorTree}
+              onChange={saveTree}
+              onReset={resetToDefault}
+              onExport={exportTree}
+              onImport={importTree}
               plugins={plugins}
+              autoSaveEnabled={true}
             />
           </TabsContent>
 

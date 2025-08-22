@@ -1,8 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Brain, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Brain, AlertCircle, Save, RotateCcw, Download, Upload } from 'lucide-react';
 import { PluginsResponse } from '@/lib/api-client';
+import { useRef } from 'react';
 
 interface BehaviorTree {
   root: any;
@@ -11,10 +13,40 @@ interface BehaviorTree {
 interface BehaviorEditorProps {
   tree: BehaviorTree;
   onChange: (tree: BehaviorTree) => void;
+  onReset?: () => void;
+  onExport?: () => void;
+  onImport?: (file: File) => Promise<BehaviorTree>;
   plugins?: PluginsResponse;
+  autoSaveEnabled?: boolean;
 }
 
-export const BehaviorEditor = ({ tree, onChange, plugins }: BehaviorEditorProps) => {
+export const BehaviorEditor = ({ 
+  tree, 
+  onChange, 
+  onReset, 
+  onExport, 
+  onImport, 
+  plugins, 
+  autoSaveEnabled = false 
+}: BehaviorEditorProps) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && onImport) {
+      try {
+        await onImport(file);
+      } catch (error) {
+        console.error('Import failed:', error);
+      }
+    }
+    // Reset the input so the same file can be selected again
+    event.target.value = '';
+  };
   return (
     <Card>
       <CardHeader>
@@ -78,14 +110,50 @@ export const BehaviorEditor = ({ tree, onChange, plugins }: BehaviorEditorProps)
           </Alert>
         )}
 
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2">
+          {onReset && (
+            <Button variant="outline" size="sm" onClick={onReset}>
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Reset to Default
+            </Button>
+          )}
+          {onExport && (
+            <Button variant="outline" size="sm" onClick={onExport}>
+              <Download className="h-4 w-4 mr-1" />
+              Export JSON
+            </Button>
+          )}
+          {onImport && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleImportClick}>
+                <Upload className="h-4 w-4 mr-1" />
+                Import JSON
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
+            </>
+          )}
+        </div>
+
         {/* Current tree preview */}
         <div className="border rounded-lg p-4 bg-muted/50">
-          <h4 className="text-sm font-medium mb-2">Current Behavior Tree (JSON)</h4>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium">Current Behavior Tree (JSON)</h4>
+            <div className="text-xs text-muted-foreground">
+              {autoSaveEnabled ? 'Auto-saved to browser' : 'Not persisted'}
+            </div>
+          </div>
           <pre className="text-xs bg-background p-3 rounded border overflow-auto max-h-40">
             {JSON.stringify(tree, null, 2)}
           </pre>
           <p className="text-xs text-muted-foreground mt-2">
-            Visual editor coming in Step 4. For now, this shows the current tree structure.
+            Visual editor coming in Step 4. Changes are automatically saved and restored on page reload.
           </p>
         </div>
       </CardContent>

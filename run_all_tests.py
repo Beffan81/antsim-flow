@@ -7,22 +7,35 @@ Runs health check followed by comprehensive test suite
 import sys
 import subprocess
 import os
+import requests
 from pathlib import Path
 
 def run_command(command, description):
     """Run a command and return success status"""
+    return run_command_with_env(command, description, None)
+
+def run_command_with_env(command, description, env=None):
+    """Run a command with optional environment and return success status"""
     print(f"\n{'='*60}")
     print(f"🧪 {description}")
     print('='*60)
     
     try:
-        result = subprocess.run(command, check=False, text=True)
+        result = subprocess.run(command, check=False, text=True, env=env)
         success = result.returncode == 0
         
         print(f"{'✅' if success else '❌'} {description}: {'PASSED' if success else 'FAILED'}")
         return success
     except Exception as e:
         print(f"❌ {description}: ERROR - {e}")
+        return False
+
+def check_backend_running():
+    """Check if AntSim backend is running on port 8000"""
+    try:
+        response = requests.get("http://127.0.0.1:8000/plugins", timeout=2)
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
         return False
 
 def main():
@@ -74,9 +87,17 @@ def main():
     
     # 5. End-to-End Tests
     if os.path.exists("tests/test_integration_e2e.py"):
-        success = run_command(
+        # Check if backend is already running and set environment variable
+        backend_running = check_backend_running()
+        env = os.environ.copy()
+        if backend_running:
+            print("ℹ️  Detected running backend - using external backend mode for E2E tests")
+            env["ANTSIM_EXTERNAL_BACKEND"] = "true"
+        
+        success = run_command_with_env(
             [sys.executable, "-m", "unittest", "tests.test_integration_e2e"],
-            "End-to-End Integration Tests"
+            "End-to-End Integration Tests",
+            env
         )
         test_results.append(("E2E Tests", success))
     

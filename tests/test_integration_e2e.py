@@ -10,6 +10,7 @@ import requests
 import os
 import json
 import tempfile
+import signal
 from pathlib import Path
 
 class TestE2EIntegration(unittest.TestCase):
@@ -19,33 +20,74 @@ class TestE2EIntegration(unittest.TestCase):
         """Setup complete environment"""
         cls.backend_url = "http://127.0.0.1:8000"
         cls.backend_process = None
+        cls.external_backend = os.getenv("ANTSIM_EXTERNAL_BACKEND", "false").lower() == "true"
         
-        # Start backend
-        if os.path.exists("start_backend.py"):
-            cls.backend_process = subprocess.Popen(
-                ["python", "start_backend.py"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            # Wait for backend
-            for _ in range(30):
-                try:
-                    response = requests.get(f"{cls.backend_url}/plugins", timeout=2)
-                    if response.status_code == 200:
-                        break
-                except requests.exceptions.RequestException:
-                    pass
-                time.sleep(1)
-            else:
-                raise Exception("Backend failed to start")
+        # Check if backend is already running
+        cls.backend_already_running = cls._check_backend_running()
+        
+        if cls.external_backend or cls.backend_already_running:
+            print(f"Using {'external' if cls.external_backend else 'existing'} backend at {cls.backend_url}")
+            if not cls.backend_already_running:
+                raise Exception(f"External backend requested but not running at {cls.backend_url}")
+        else:
+            # Start our own backend
+            if os.path.exists("start_backend.py"):
+                print("Starting test backend...")
+                cls.backend_process = subprocess.Popen(
+                    ["python", "start_backend.py"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    preexec_fn=os.setsid  # Create new process group for better cleanup
+                )
+                
+                # Wait for backend with better timeout handling
+                backend_ready = False
+                for attempt in range(15):  # Reduced from 30 to 15 seconds
+                    try:
+                        response = requests.get(f"{cls.backend_url}/plugins", timeout=3)
+                        if response.status_code == 200:
+                            backend_ready = True
+                            print(f"Backend ready after {attempt + 1} seconds")
+                            break
+                    except requests.exceptions.RequestException:
+                        pass
+                    time.sleep(1)
+                
+                if not backend_ready:
+                    cls._cleanup_backend()
+                    raise Exception("Backend failed to start within 15 seconds")
+    
+    @classmethod
+    def _check_backend_running(cls):
+        """Check if backend is already running"""
+        try:
+            response = requests.get(f"{cls.backend_url}/plugins", timeout=2)
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
+    
+    @classmethod
+    def _cleanup_backend(cls):
+        """Clean up backend process"""
+        if cls.backend_process:
+            try:
+                # Try graceful shutdown first
+                cls.backend_process.terminate()
+                cls.backend_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                # Force kill if needed
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(cls.backend_process.pid), signal.SIGKILL)
+                else:
+                    cls.backend_process.kill()
+                cls.backend_process.wait()
     
     @classmethod
     def tearDownClass(cls):
         """Clean up"""
-        if cls.backend_process:
-            cls.backend_process.terminate()
-            cls.backend_process.wait(timeout=10)
+        # Only cleanup if we started our own backend
+        if not cls.external_backend and not cls.backend_already_running:
+            cls._cleanup_backend()
     
     def test_default_ant_behavior_config(self):
         """Test the default ant behavior configuration from JSON"""

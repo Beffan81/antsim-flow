@@ -80,22 +80,35 @@ class HealthChecker:
             self.log("Write Permissions", "FAIL", str(e))
 
     def test_dependencies(self):
-        """Test dependency installation"""
+        """Test dependency availability (does not install)"""
         print("\n=== 2. Dependencies ===")
         
-        # Python dependencies
+        # Check Python dependencies
         if os.path.exists("requirements.txt"):
-            success, stdout, stderr = self.run_command(["pip", "install", "-r", "requirements.txt"], timeout=120)
-            self.log("Python Dependencies", "PASS" if success else "FAIL", 
-                    "requirements.txt installed" if success else stderr[:100])
+            # Try to import critical modules to verify installation
+            critical_modules = ["fastapi", "uvicorn", "pyyaml", "pluggy", "pydantic", "numpy"]
+            missing_modules = []
+            
+            for module in critical_modules:
+                try:
+                    __import__(module)
+                except ImportError:
+                    missing_modules.append(module)
+            
+            if missing_modules:
+                self.log("Python Dependencies", "FAIL", 
+                        f"Missing modules: {', '.join(missing_modules)}. Run: pip install -r requirements.txt")
+            else:
+                self.log("Python Dependencies", "PASS", "All critical Python modules available")
         else:
             self.log("Python Dependencies", "WARN", "requirements.txt not found")
             
-        # Node dependencies
+        # Check Node dependencies
         if os.path.exists("package.json"):
-            success, stdout, stderr = self.run_command(["npm", "install"], timeout=180)
-            self.log("Node Dependencies", "PASS" if success else "FAIL",
-                    "package.json installed" if success else stderr[:100])
+            if os.path.exists("node_modules"):
+                self.log("Node Dependencies", "PASS", "node_modules directory exists")
+            else:
+                self.log("Node Dependencies", "FAIL", "node_modules not found. Run: npm install")
         else:
             self.log("Node Dependencies", "WARN", "package.json not found")
 

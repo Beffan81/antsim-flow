@@ -4,12 +4,13 @@ Eine webbasierte Benutzeroberfläche für das AntSim Ameisenkolonie-Simulationss
 
 ## 🚀 Schnellstart (GitHub Codespaces)
 
-### 1. Ersteinrichtung & Volltest
+### 1. Einmalige Ersteinrichtung
 ```bash
-# Schritt 1: Komplette Umgebungsprüfung und -einrichtung
-python codespace_health_check.py
+# Schritt 1: Dependencies installieren (zwingend erforderlich)
+pip install -r requirements.txt
+npm install
 
-# Schritt 2: Falls Health Check erfolgreich - Volltest ausführen
+# Schritt 2: Vollständige Umgebungs- und Funktionsprüfung
 python run_all_tests.py
 ```
 
@@ -22,60 +23,55 @@ python start_backend.py
 npm run dev
 ```
 
-### 3. Nach erfolgreichem Start
+### 3. Zugriff auf die Anwendung
 - **Backend API**: http://127.0.0.1:8000
 - **Frontend UI**: http://127.0.0.1:5173
 - **API Dokumentation**: http://127.0.0.1:8000/docs
 
-## 🧪 Test-Workflow & Ausführungsreihenfolge
+## 🧪 Test-Workflows (Optimierte Reihenfolge)
 
-### Bei Projektbeginn (einmalig)
+### Ersteinrichtung (einmalig, nach Git-Clone)
 ```bash
-# 1. Umgebung prüfen und einrichten
-python codespace_health_check.py
-
-# 2. Kernfunktionalität testen
-python antsim_test_runner.py
-
-# 3. Abhängigkeiten installieren
+# 1. KRITISCH: Dependencies zuerst installieren
 pip install -r requirements.txt
 npm install
 
-# 4. Volltest durchführen
+# 2. Kompletter Systemtest (inkludiert alle anderen Tests)
 python run_all_tests.py
 ```
 
-### Nach Verhaltensanpassungen (Standard-Workflow)
+### Entwicklungsworkflow
+
+#### Nach Code-Änderungen (Schnelltest)
 ```bash
-# 1. Core-Tests (nach Änderungen am Verhalten/Plugins)
-python antsim_test_runner.py
-
-# 2. Backend-API Tests (nach API-Änderungen)
-python -m unittest tests.test_backend_api
-
-# 3. End-to-End Tests (nach Konfigurationsänderungen)
-python -m unittest tests.test_integration_e2e
-
-# 4. Schnelltest der neuen Konfiguration
-python test_step2.py
+# Nur die relevanten Tests ausführen:
+python antsim_test_runner.py              # Bei Core-Änderungen
+python -m unittest tests.test_backend_api # Bei API-Änderungen  
+python test_step2.py                      # Schnelle API-Validierung
 ```
 
-### Bei Frontend-Änderungen
+#### Nach größeren Änderungen
 ```bash
-# 1. TypeScript-Prüfung
-npx tsc --noEmit
-
-# 2. Build-Test
-npm run build
-
-# 3. Frontend-Integration
-python -m unittest tests.test_frontend_integration
-```
-
-### Vor jedem Commit
-```bash
-# Kompletter Durchlauf aller Tests
+# Vollständige Validierung vor Commit
 python run_all_tests.py
+```
+
+#### Frontend-spezifische Tests
+```bash
+npx tsc --noEmit                          # TypeScript-Validierung
+npm run build                             # Build-Test
+python -m unittest tests.test_frontend_integration  # UI-Tests
+```
+
+### Problemdiagnose (bei Fehlern)
+```bash
+# 1. Isolierte Umgebungsprüfung (ohne Installation)
+python codespace_health_check.py
+
+# 2. Einzelne Test-Komponenten
+python antsim_test_runner.py              # Core-System
+python test_step2.py                      # API-Kommunikation
+python -m unittest tests.test_integration_e2e  # End-to-End
 ```
 
 ## 📁 Projekt-Struktur

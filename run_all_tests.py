@@ -49,6 +49,31 @@ def main():
     
     test_results = []
     
+    # 0. Install Dependencies First (if needed)
+    print("\n🔧 Ensuring dependencies are installed...")
+    
+    # Python dependencies
+    if os.path.exists("requirements.txt"):
+        success = run_command(
+            [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+            "Python Dependencies Installation"
+        )
+        test_results.append(("Python Dependencies", success))
+        if not success:
+            print("❌ Python dependency installation failed - aborting")
+            return False
+    
+    # Node dependencies  
+    if os.path.exists("package.json") and not os.path.exists("node_modules"):
+        success = run_command(
+            ["npm", "install"],
+            "Node Dependencies Installation"
+        )
+        test_results.append(("Node Dependencies", success))
+        if not success:
+            print("❌ Node dependency installation failed - aborting")
+            return False
+    
     # 1. Health Check (mandatory)
     success = run_command(
         [sys.executable, "codespace_health_check.py"],

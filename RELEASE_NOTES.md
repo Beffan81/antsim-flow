@@ -1,6 +1,46 @@
 # Release Notes
 
-## Version 1.1.0 - Comprehensive Testing Framework (Aktuell)
+## Version 1.2.0 - Enhanced Foraging & Display Management (Aktuell)
+
+### 🎉 Neue Features
+- **Comprehensive Foraging Behavior**: Vollständiges Social Foraging System mit intelligenter Nahrungssuche
+- **Pygame Display Management**: Automatisches Headless-Mode Fallback für Codespaces und Container
+- **Social Stomach System**: Realistische Nahrungsaufnahme, -speicherung und -verteilung zwischen Ameisen
+- **Advanced Pheromone Trails**: Intelligente Trail-Deposition beim Rückweg zum Nest mit Nahrung
+- **Spiral Search Algorithm**: Systematische Exploration in Spiralmustern um das Nest herum
+- **Display Diagnostic Tools**: `test_pygame_display.py` für umfassende Rendering-Problembehebung
+
+### 🔧 Verbesserungen
+- **Robustes Display Handling**: Automatische Erkennung von Display-Verfügbarkeit und SDL-Treiber-Auswahl
+- **Erweiterte Plugin-Architektur**: 24 neue Foraging-spezifische Funktionen (Sensoren, Triggers, Steps)
+- **Environment Variable Support**: `SDL_VIDEODRIVER`, `ANTSIM_WINDOW_HOLD`, erweiterte Logging-Optionen
+- **Codespaces Kompatibilität**: Nahtlose Headless-Mode-Integration für Container-Umgebungen
+- **Enhanced Error Reporting**: Detaillierte Pygame- und Display-spezifische Fehlermeldungen
+
+### 🐜 Erweiterte Ameisen-Verhaltensweisen
+- **Social Foraging Sequence**: Nest verlassen → Spiral-Suche → Nahrung sammeln → Trail-Deposition → Rückkehr
+- **Pheromone Trail Following**: Intelligente Pfadfindung zu bekannten, hochwertigen Nahrungsquellen
+- **Spiral Search Pattern**: Mathematisch optimierte Spiralen für systematische Umgebungsexploration
+- **Social Stomach Management**: Realistische Hunger-Sättigung-Zyklen mit sozialer Nahrungsverteilung
+- **Nest Entry/Exit Logic**: Intelligente Navigation zu den nächstgelegenen Nest-Ein-/Ausgängen
+
+### 🛠️ Technische Erweiterungen
+- **10 neue Sensor-Funktionen**: `spiral_search_sensor`, `food_source_sensor`, `nest_distance_sensor`, `foraging_state_sensor`
+- **10 neue Trigger-Funktionen**: `social_stomach_full/empty`, `outside_nest`, `near_nest_entry`, `food_available_nearby`, etc.
+- **6 neue Step-Funktionen**: `leave_nest_step`, `spiral_search_step`, `move_to_food_step`, `collect_and_eat_step`, etc.
+- **Erweiterte Blackboard-Integration**: 15+ neue Schlüssel für Foraging-States, Position-Tracking, Spiral-Parameter
+- **Enhanced Subprocess Management**: Bessere Environment-Variable-Behandlung in `run_manager.py`
+
+### 🎮 Display & Rendering
+- **Automatisches Headless Fallback**: `SDL_VIDEODRIVER=dummy` wird automatisch gesetzt wenn kein DISPLAY verfügbar ist
+- **Display Detection Logic**: Robuste Erkennung von X11/Wayland/Container-Umgebungen
+- **Window Hold Configuration**: Konfigurierbare Anzeigedauer für Debugging und Demonstration
+- **Pygame Error Recovery**: Graceful Fallback wenn Display-Initialisierung fehlschlägt
+- **Diagnostic Test Script**: Umfassende Display-Kompatibilitätsprüfung mit Empfehlungen
+
+---
+
+## Version 1.1.0 - Comprehensive Testing Framework
 
 ### 🎉 Neue Features
 - **Umfassende Test-Suite**: Automatisierte Tests für alle Komponenten

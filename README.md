@@ -102,25 +102,67 @@ antsim-flow/
 
 ## 🐜 Standard-Ameisen-Verhalten
 
-Das Projekt enthält eine vorkonfigurierte, komplexe Ameisen-Verhaltenslogik:
+Das Projekt enthält mehrere vorkonfigurierte, komplexe Ameisen-Verhaltenslogiken:
 
+### **Comprehensive Foraging Behavior** (Neu in v1.2.0)
+- **Social Stomach System**: Realistische Nahrungsaufnahme und -verteilung
+- **Spiral Search Algorithm**: Systematische Nahrungssuche um das Nest
+- **Pheromone Trail System**: Intelligente Pfadfindung zu bekannten Nahrungsquellen
+- **Nest Navigation**: Automatisches Entry/Exit-Management
+- **Social Foraging Sequence**: Verlassen → Suchen → Sammeln → Rückkehr
+
+### **Standard-Verhalten** (Basis-Konfiguration)
 - **Umgebung**: 50x50 Gitter mit Nest-Eingängen
 - **Königin**: Zentrale Steuerung mit Pheromonen
 - **Arbeiterinnen**: Komplexe Aufgabenverteilung (15 Tasks)
 - **Futtersuche**: Intelligente Suchstrategien
 - **Sozialverhalten**: Fütterung und Kommunikation
 
+### **Behavior Tree Templates**
+1. **Default**: Basis-Verhalten für Entwicklung und Tests
+2. **Hunger Signaling MVP**: Minimale soziale Interaktion
+3. **Comprehensive Foraging**: Vollständiges Social Foraging System
+
 ### Verhalten anpassen
-1. Konfiguration in `src/components/antsim-app.tsx` bearbeiten
-2. Tests ausführen: `python -m unittest tests.test_integration_e2e`
-3. Simulation testen: `python test_step2.py`
-4. Volltest: `python run_all_tests.py`
+1. Template im Behavior Tree Editor auswählen
+2. Konfiguration in `src/components/antsim-app.tsx` bearbeiten
+3. Tests ausführen: `python -m unittest tests.test_integration_e2e`
+4. Simulation testen: `python test_step2.py`
+5. Volltest: `python run_all_tests.py`
+
+## 🎮 Display & Rendering
+
+### **Pygame Display Management** (Neu in v1.2.0)
+- **Automatisches Headless-Mode Fallback**: Für Codespaces und Container-Umgebungen
+- **Display-Verfügbarkeit-Erkennung**: Automatische Prüfung von DISPLAY-Variablen
+- **SDL-Treiber-Auswahl**: Flexible Rendering-Backend-Auswahl
+- **Window Hold Configuration**: Konfigurierbare Anzeigedauer
+
+### **Environment Variables für Display-Control**
+```bash
+export SDL_VIDEODRIVER=dummy           # Für headless pygame
+export ANTSIM_WINDOW_HOLD=10.0        # Fenster-Anzeigedauer (Sekunden)
+export ANTSIM_LOG_LEVEL=DEBUG         # Erweiterte Display-Logs
+```
+
+### **Display-Diagnose**
+```bash
+# Display-Verfügbarkeit prüfen
+python test_pygame_display.py
+
+# Display-Environment testen
+echo $DISPLAY && xdpyinfo
+
+# Pygame-Initialisierung testen
+python -c "import pygame; pygame.init(); print('OK')"
+```
 
 ## 🔧 Technologien
 
 - **Frontend**: React, TypeScript, Tailwind CSS, Vite
 - **Backend**: Python, FastAPI, Uvicorn
 - **Simulation**: AntSim Engine mit Plugin-System
+- **Rendering**: Pygame mit SDL, Headless-Mode Support
 - **Testing**: unittest, Selenium, Requests
 - **Deployment**: GitHub Codespaces, Docker-ready
 
@@ -171,10 +213,45 @@ python test_step2.py
 python start_backend.py  # Ausgabe beobachten
 ```
 
+### **Pygame Display Issues** (Neu in v1.2.0)
+```bash
+# 1. Display-Diagnose ausführen
+python test_pygame_display.py
+
+# 2. Headless-Mode aktivieren
+export SDL_VIDEODRIVER=dummy
+export ANTSIM_WINDOW_HOLD=5.0
+
+# 3. Display-Environment prüfen
+echo $DISPLAY
+xdpyinfo  # Sollte Display-Info zeigen
+
+# 4. Pygame-Initialisierung testen
+python -c "import pygame; pygame.init(); screen = pygame.display.set_mode((400,300)); print('Display OK')"
+
+# 5. Extended Logging aktivieren
+export ANTSIM_LOG_LEVEL=DEBUG
+python start_backend.py  # Pygame-spezifische Logs beobachten
+```
+
 ### Codespaces Port-Probleme
 1. Ports auf "Public" setzen (nicht "Private")
 2. Browser-Cache leeren
 3. Neue Terminal-Sitzung starten
+
+### **Codespaces Display-Unterstützung**
+```bash
+# Für grafische Ausgabe in Codespaces (optional)
+sudo apt-get update
+sudo apt-get install -y xvfb x11-utils
+
+# Virtual Display starten
+export DISPLAY=:99
+Xvfb :99 -screen 0 1024x768x24 &
+
+# Oder einfach headless verwenden (empfohlen)
+export SDL_VIDEODRIVER=dummy
+```
 
 ## 📊 Performance-Tipps
 

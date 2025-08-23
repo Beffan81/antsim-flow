@@ -22,6 +22,8 @@ def register_steps() -> Dict[str, callable]:
     """Expose forage-related steps."""
     return {
         "find_food_source": find_food_source_step,
+        "move_to_food": move_to_food_step,
+        "collect_food": collect_food_step,
     }
 
 
@@ -90,3 +92,108 @@ def find_food_source_step(worker: Any, environment: Any, **kwargs) -> Dict[str, 
         wid, pos, food_pos
     )
     return {"status": "FAILURE"}
+
+
+def move_to_food_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
+    """
+    Move towards detected food source (one step closer).
+    
+    Reads BB keys:
+      - 'food_position' ([x, y])
+      - 'position' ([x, y])
+    
+    Returns:
+      - {'status': 'SUCCESS', 'intents': [MOVE_intent]} if movement possible
+      - {'status': 'FAILURE'} if no food position or already adjacent
+    """
+    wid = getattr(worker, "id", "?")
+    pos = _bb_pos(worker)
+    food_pos = _bb_get(worker, "food_position", None)
+    
+    if not food_pos or not isinstance(food_pos, (list, tuple)) or len(food_pos) != 2:
+        log.debug("step=move_to_food worker=%s status=no_food_pos pos=%s", wid, pos)
+        return {"status": "FAILURE"}
+    
+    try:
+        fpos = (int(food_pos[0]), int(food_pos[1]))
+    except Exception:
+        log.debug("step=move_to_food worker=%s status=invalid_food_pos pos=%s food=%s", wid, pos, food_pos)
+        return {"status": "FAILURE"}
+    
+    # Check if already adjacent (Manhattan distance <= 1)
+    if _manhattan(pos, fpos) <= 1:
+        log.debug("step=move_to_food worker=%s status=already_adjacent pos=%s food=%s", wid, pos, fpos)
+        return {"status": "SUCCESS"}  # Already there
+    
+    # Calculate next step towards food
+    dx = fpos[0] - pos[0]
+    dy = fpos[1] - pos[1]
+    
+    # Normalize to single step
+    if dx != 0:
+        dx = 1 if dx > 0 else -1
+    if dy != 0:
+        dy = 1 if dy > 0 else -1
+    
+    target_pos = [pos[0] + dx, pos[1] + dy]
+    
+    intent = {
+        "type": "MOVE",
+        "target_position": target_pos,
+        "reason": "approaching_food",
+    }
+    
+    log.info("step=move_to_food worker=%s status=moving pos=%s target=%s food=%s", 
+             wid, pos, target_pos, fpos)
+    
+    return {
+        "status": "SUCCESS",
+        "intents": [intent],
+    }
+
+
+def collect_food_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
+    """
+    Collect food from adjacent cell.
+    
+    Reads BB keys:
+      - 'food_position' ([x, y])
+      - 'position' ([x, y])
+    
+    Returns:
+      - {'status': 'SUCCESS', 'intents': [COLLECT_FOOD_intent]} if collection possible
+      - {'status': 'FAILURE'} if not adjacent to food
+    """
+    wid = getattr(worker, "id", "?")
+    pos = _bb_pos(worker)
+    food_pos = _bb_get(worker, "food_position", None)
+    
+    if not food_pos or not isinstance(food_pos, (list, tuple)) or len(food_pos) != 2:
+        log.debug("step=collect_food worker=%s status=no_food_pos pos=%s", wid, pos)
+        return {"status": "FAILURE"}
+    
+    try:
+        fpos = (int(food_pos[0]), int(food_pos[1]))
+    except Exception:
+        log.debug("step=collect_food worker=%s status=invalid_food_pos pos=%s food=%s", wid, pos, food_pos)
+        return {"status": "FAILURE"}
+    
+    # Check adjacency (Manhattan distance <= 1)
+    distance = _manhattan(pos, fpos)
+    if distance > 1:
+        log.debug("step=collect_food worker=%s status=not_adjacent pos=%s food=%s dist=%d", 
+                  wid, pos, fpos, distance)
+        return {"status": "FAILURE"}
+    
+    intent = {
+        "type": "COLLECT_FOOD",
+        "target_position": list(fpos),
+        "reason": "food_collection",
+    }
+    
+    log.info("step=collect_food worker=%s status=collecting pos=%s food=%s", wid, pos, fpos)
+    
+    return {
+        "status": "SUCCESS",
+        "intents": [intent],
+    }

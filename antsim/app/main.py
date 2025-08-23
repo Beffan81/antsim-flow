@@ -240,7 +240,15 @@ def run_demo(ticks: int = 100) -> None:
     # Fenster initialisieren (tolerant, wenn pygame fehlt)
     log.info("Initialisiere Pygame-Fenster...")
     renderer.init_window(env.width, env.height, dashboard_width=0, title="antsim new core")
-    log.info("Pygame-Fenster erstellt, starte Simulation")
+    
+    # Check if renderer actually initialized properly
+    if not hasattr(renderer, '_screen') or renderer._screen is None:
+        log.warning("Pygame window failed to initialize - simulation will run without display")
+        log.warning("This is common in containerized environments without display support")
+        log.info("To run headless: export SDL_VIDEODRIVER=dummy")
+        log.info("To enable X11 forwarding: export DISPLAY=:0 (and ensure X11 forwarding is set up)")
+    else:
+        log.info("Pygame-Fenster erfolgreich erstellt, starte Simulation")
 
     # 5) Tick-Schleife mit konfigurierbarer Geschwindigkeit
     # Optional: Pygame-Events verarbeiten, wenn verfügbar
@@ -269,19 +277,22 @@ def run_demo(ticks: int = 100) -> None:
 
         # Rendering (nutzt ausschließlich neue Core-Daten)
         info_overlay = {"tick": t, "result": result}
-        renderer.draw(environment=env, ants=[worker], queen=None, brood=[], info=info_overlay)
-        renderer.flip()
+        try:
+            renderer.draw(environment=env, ants=[worker], queen=None, brood=[], info=info_overlay)
+            renderer.flip()
+        except Exception as render_err:
+            log.debug("Rendering failed (tick %d): %s - continuing simulation", t, render_err)
 
-        # Events verarbeiten (nur falls pygame verfügbar)
-        if _HAS_PYGAME:
+        # Events verarbeiten (nur falls pygame verfügbar und renderer initialized)
+        if _HAS_PYGAME and hasattr(renderer, '_screen') and renderer._screen is not None:
             try:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         log.info("QUIT event received, aborting demo loop")
                         raise KeyboardInterrupt()
-            except Exception:
+            except Exception as event_err:
                 # Defensive: Rendering/Events dürfen die Demo nicht crashen
-                pass
+                log.debug("Event processing failed (tick %d): %s", t, event_err)
 
         # Zusammenfassung relevanter BB-Fakten für die Nachvollziehbarkeit
         bb = worker.blackboard
@@ -305,8 +316,8 @@ def run_demo(ticks: int = 100) -> None:
 
     log.info("=== Demo abgeschlossen ===")
     
-    # Fenster offen halten für bessere Beobachtbarkeit
-    if window_hold > 0 and _HAS_PYGAME:
+    # Fenster offen halten für bessere Beobachtbarkeit (nur wenn display verfügbar)
+    if window_hold > 0 and _HAS_PYGAME and hasattr(renderer, '_screen') and renderer._screen is not None:
         log.info("Halte Fenster für %.1f Sekunden offen (ESC oder Fenster schließen zum Beenden)", window_hold)
         start_time = time.time()
         while time.time() - start_time < window_hold:
@@ -322,6 +333,9 @@ def run_demo(ticks: int = 100) -> None:
             except Exception:
                 # Defensive: Events dürfen nicht crashen
                 time.sleep(0.1)
+    elif window_hold > 0:
+        log.info("Halte Simulation für %.1f Sekunden am Leben (kein Display verfügbar)", window_hold)
+        time.sleep(window_hold)
     
     # Abschließender Flush
     try:

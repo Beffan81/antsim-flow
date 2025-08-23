@@ -124,18 +124,49 @@ class Renderer:
         if not _PYGAME_OK:
             log.error("Cannot init window: pygame not available")
             return
+        
+        # Check display availability
+        import os
+        display = os.environ.get("DISPLAY")
+        if not display and os.name != "nt":
+            log.warning("DISPLAY environment variable not set - trying headless mode")
+            # Try setting SDL to use dummy video driver for headless mode
+            os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        
+        log.info("Attempting pygame initialization with DISPLAY=%s, SDL_VIDEODRIVER=%s",
+                display, os.environ.get("SDL_VIDEODRIVER", "default"))
+        
         try:
             pygame.init()
+            
+            # Check if pygame can actually create a display
             window_w = width * self.cell_size + int(dashboard_width)
             window_h = height * self.cell_size
+            
+            log.info("Creating pygame display with size %dx%d", window_w, window_h)
             self._screen = pygame.display.set_mode((window_w, window_h))
+            
+            if self._screen is None:
+                raise RuntimeError("pygame.display.set_mode returned None")
+            
             pygame.display.set_caption(title)
             self._surface = pygame.Surface((window_w, window_h))
-            self._font = pygame.font.Font(None, 16)
-            log.info("Renderer window initialized size=%dx%d", window_w, window_h)
+            
+            try:
+                self._font = pygame.font.Font(None, 16)
+            except Exception as font_err:
+                log.warning("Font initialization failed, using default: %s", font_err)
+                self._font = None
+            
+            log.info("Renderer window successfully initialized size=%dx%d", window_w, window_h)
+            
         except Exception as e:
-            log.error("Pygame init failed: %s", e, exc_info=True)
+            log.error("Pygame window initialization failed: %s", e, exc_info=True)
+            log.error("This is likely due to missing display or X11 forwarding in containerized environments")
+            log.info("Consider running with headless mode: export SDL_VIDEODRIVER=dummy")
             self._screen = None
+            self._surface = None
+            self._font = None
 
     def close(self) -> None:
         """Close window and quit Pygame."""

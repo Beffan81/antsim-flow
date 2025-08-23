@@ -105,9 +105,21 @@ class RunManager:
         env = os.environ.copy()
         # Unbuffered stdout for immediate logs (optional)
         env.setdefault("PYTHONUNBUFFERED", "1")
-        # Ensure DISPLAY is properly set for pygame
+        
+        # Enhanced display environment handling
         if "DISPLAY" in os.environ:
             env["DISPLAY"] = os.environ["DISPLAY"]
+            log.info("Passing DISPLAY=%s to subprocess", env["DISPLAY"])
+        else:
+            log.warning("DISPLAY not set - subprocess will likely run headless")
+            # Suggest headless mode for containerized environments
+            env.setdefault("SDL_VIDEODRIVER", "dummy")
+            log.info("Setting SDL_VIDEODRIVER=dummy for headless operation")
+        
+        # Pass through SDL driver settings
+        if "SDL_VIDEODRIVER" in os.environ:
+            env["SDL_VIDEODRIVER"] = os.environ["SDL_VIDEODRIVER"]
+            log.info("Using SDL_VIDEODRIVER=%s", env["SDL_VIDEODRIVER"])
         
         # Create log files for capturing subprocess output
         import tempfile

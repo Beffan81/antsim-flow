@@ -22,8 +22,8 @@ def register_steps() -> Dict[str, callable]:
     """Expose forage-related steps."""
     return {
         "find_food_source": find_food_source_step,
-        "move_to_food": move_to_food_step,
-        "collect_food": collect_food_step,
+        "move_to_food_basic": move_to_food_step,
+        "collect_food_basic": collect_food_step,
     }
 
 

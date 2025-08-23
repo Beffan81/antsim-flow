@@ -365,6 +365,9 @@ def main():
     """CLI-Einstieg für die neue Pipeline-Demo mit zentralem Logging."""
     level, json_lines = _parse_log_env_defaults()
     setup_logging(level=level, json_lines=json_lines)
+    # Create logger instance after setup
+    log = logging.getLogger(__name__)
+    
     # Optional: spezifische Level anpassen (Beispiel)
     set_namespace_levels({
         "antsim.behavior": level,

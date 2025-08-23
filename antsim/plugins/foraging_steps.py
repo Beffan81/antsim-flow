@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 def register_steps() -> Dict[str, callable]:
     """Expose foraging steps."""
     return {
-        "leave_nest": leave_nest_step,
+        "leave_nest_advanced": leave_nest_step,
         "spiral_search": spiral_search_step,
-        "move_to_food": move_to_food_step,
+        "move_to_food_advanced": move_to_food_step,
         "collect_and_eat": collect_and_eat_step,
-        "return_to_nest": return_to_nest_step,
+        "return_to_nest_advanced": return_to_nest_step,
         "deposit_trail_pheromone": deposit_trail_pheromone_step,
     }
 

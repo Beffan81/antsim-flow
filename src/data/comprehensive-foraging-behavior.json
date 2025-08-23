@@ -39,7 +39,7 @@
                     "type": "step",
                     "id": "leave_nest_step",
                     "name": "LeaveNest",
-                    "stepName": "leave_nest",
+                    "stepName": "leave_nest_advanced",
                     "params": {}
                   }
                 ]
@@ -81,7 +81,7 @@
                     "type": "step",
                     "id": "move_to_food_step",
                     "name": "MoveToFood",
-                    "stepName": "move_to_food",
+                    "stepName": "move_to_food_advanced",
                     "params": {}
                   }
                 ]
@@ -158,7 +158,7 @@
                     "type": "step",
                     "id": "return_to_nest_step",
                     "name": "ReturnToNest",
-                    "stepName": "return_to_nest",
+                    "stepName": "return_to_nest_advanced",
                     "params": {}
                   }
                 ]
@@ -167,7 +167,7 @@
                 "type": "step",
                 "id": "simple_return_step",
                 "name": "SimpleReturn",
-                "stepName": "return_to_nest",
+                "stepName": "return_to_nest_advanced",
                 "params": {}
               }
             ]

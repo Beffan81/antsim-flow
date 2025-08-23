@@ -50,7 +50,7 @@ def register_triggers() -> Dict[str, callable]:
         "food_search_exhausted": food_search_exhausted,
         
         # Pheromone conditions
-        "pheromone_gradient_available": pheromone_gradient_available,
+        "pheromone_detected_simple": pheromone_gradient_available,
         "should_deposit_trail": should_deposit_trail,
     }
 

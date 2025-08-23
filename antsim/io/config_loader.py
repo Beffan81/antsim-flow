@@ -50,12 +50,44 @@ class EnvironmentConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
-    """Minimal-Agentschema passend zum Worker-Init."""
-    energy: int = 100
-    max_energy: int = 100
-    stomach_capacity: int = 100
-    social_stomach_capacity: int = 100
-    hunger_threshold: int = 50
+    """Configuration for both queens and workers."""
+    # Legacy support: total agent count (deprecated)
+    count: Optional[int] = Field(None, ge=1, description="Total agent count (deprecated, use queen_count + worker_count)")
+    
+    # New composition-based configuration
+    queen_count: int = Field(1, ge=1, description="Number of queens")
+    worker_count: int = Field(2, ge=0, description="Number of workers")
+    
+    # Queen-specific configuration
+    queen_config: Dict[str, Any] = Field(default_factory=lambda: {
+        "energy": 200,
+        "max_energy": 200,
+        "social_stomach": 150,
+        "social_stomach_capacity": 150,
+        "egg_laying_interval": 10,
+        "max_eggs": 100,
+        "hunger_threshold": 75,
+    })
+    
+    # Worker-specific configuration
+    worker_config: Dict[str, Any] = Field(default_factory=lambda: {
+        "energy": 100,
+        "max_energy": 100,
+        "stomach_capacity": 100,
+        "social_stomach_capacity": 100,
+        "hunger_threshold": 50,
+    })
+    
+    @field_validator("count")
+    @classmethod
+    def validate_legacy_count(cls, v, values):
+        """Warn about deprecated count field."""
+        if v is not None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "AgentConfig.count is deprecated. Use queen_count and worker_count instead."
+            )
+        return v
 
 
 class StepRef(BaseModel):

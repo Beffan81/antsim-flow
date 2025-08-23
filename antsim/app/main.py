@@ -26,6 +26,8 @@ from typing import Any, Dict, Optional, List, Tuple
 from ..registry.manager import PluginManager
 from ..behavior.bt import BehaviorEngine
 from ..core.worker import Worker
+from ..core.queen import Queen
+from ..core.agents import AgentFactory
 from ..io.config_loader import load_behavior_tree
 from ..core.engine.pheromones import PheromoneField  # Double-Buffer Engine
 from ..io.logging_setup import setup_logging, set_namespace_levels
@@ -103,17 +105,21 @@ class DemoEnvironment:
 
 # ----------------- Demo Runner -----------------
 
-def build_demo_worker() -> Worker:
-    """Erstellt einen Worker mit sinnvollen Defaults für die Sensorik."""
-    cfg = {
-        "energy": 100,
-        "max_energy": 100,
-        "stomach_capacity": 100,
-        "social_stomach_capacity": 100,
-        "hunger_threshold": 50,
-    }
-    # Start außerhalb des Nests, nicht am Eingang
-    return Worker(worker_id=1, position=(10, 10), config=cfg)
+def build_demo_colony() -> Tuple[List[Queen], List[Worker]]:
+    """Erstellt eine Kolonie mit 1 Königin und 2 Arbeiterinnen."""
+    factory = AgentFactory()
+    
+    # Entry positions for the colony
+    entry_positions = [(1, 1), (1, 2), (2, 1)]
+    
+    # Create initial colony: 1 queen + 2 workers
+    queens, workers = factory.create_initial_colony(
+        entry_positions=entry_positions,
+        queen_count=1,
+        worker_count=2
+    )
+    
+    return queens, workers
 
 
 # Minimaler BT als Fallback (JSON-String)
@@ -218,17 +224,27 @@ def run_demo(ticks: int = 100) -> None:
     log.info("Plugins geladen: steps=%s triggers=%s sensors=%s",
              pm.list_steps(), pm.list_triggers(), pm.list_sensors())
 
-    # 2) Environment + Worker
+    # 2) Environment + Colony (1 Queen + 2 Workers)
     env = DemoEnvironment()
-    worker = build_demo_worker()
-
+    queens, workers = build_demo_colony()
+    
+    # Set queen reference in environment for queen_steps to work
+    env.queen = queens[0] if queens else None
+    
+    # Get all agents for processing
+    all_agents = queens + workers
+    
     # WICHTIG: Startbelegung im Grid setzen, damit Kollisionserkennung/Sensoren korrekt arbeiten
-    try:
-        x, y = worker.position
-        env.grid[y][x].ant = worker
-        log.debug("initial_occupancy_set worker=%s pos=%s", worker.id, worker.position)
-    except Exception as e:
-        log.warning("could_not_set_initial_occupancy err=%s", e)
+    for agent in all_agents:
+        try:
+            x, y = agent.position
+            if 0 <= x < env.width and 0 <= y < env.height:
+                env.grid[y][x].ant = agent
+                log.debug("initial_occupancy_set agent=%s type=%s pos=%s", 
+                         agent.id, type(agent).__name__, agent.position)
+        except Exception as e:
+            log.warning("could_not_set_initial_occupancy agent=%s err=%s", 
+                       getattr(agent, 'id', 'unknown'), e)
 
     # 3) BT aus Config bauen (validiert Step-/Trigger-Namen)
     root = _load_bt_root(pm, sys.argv)
@@ -265,10 +281,23 @@ def run_demo(ticks: int = 100) -> None:
 
     for t in range(1, ticks + 1):
         env.cycle_count = t
-        log.info("---- TICK %d ----", t)
+        log.info("---- TICK %d ---- (Colony: %d queens, %d workers)", 
+                t, len(queens), len(workers))
 
-        # BT-Tick (sensors -> bt -> intents -> executor -> sensors)
-        result = engine.tick_worker(worker, env)
+        # BT-Tick for all agents (queens and workers)
+        results = []
+        for agent in all_agents:
+            if hasattr(engine, 'tick_worker'):
+                result = engine.tick_worker(agent, env)
+            else:
+                # Fallback for older engine versions
+                result = engine.tick(agent, env)
+            results.append((agent.id, type(agent).__name__, result))
+        
+        # Queen egg laying logic
+        for queen in queens:
+            if queen.can_lay_egg(t):
+                queen.lay_egg(t)
 
         # Pheromon-Engine aktualisieren (Diffusion/Verdunstung/Swap einmal pro Tick)
         ph_summary = env.pheromones_tick()
@@ -276,9 +305,20 @@ def run_demo(ticks: int = 100) -> None:
             log.info("pheromones_tick_summary tick=%d types=%d", t, len(ph_summary))
 
         # Rendering (nutzt ausschließlich neue Core-Daten)
-        info_overlay = {"tick": t, "result": result}
+        info_overlay = {
+            "tick": t, 
+            "queens": len(queens),
+            "workers": len(workers),
+            "results": results
+        }
         try:
-            renderer.draw(environment=env, ants=[worker], queen=None, brood=[], info=info_overlay)
+            renderer.draw(
+                environment=env, 
+                ants=workers,  # Workers as ants 
+                queen=queens[0] if queens else None,  # First queen
+                brood=[], 
+                info=info_overlay
+            )
             renderer.flip()
         except Exception as render_err:
             log.debug("Rendering failed (tick %d): %s - continuing simulation", t, render_err)
@@ -294,15 +334,22 @@ def run_demo(ticks: int = 100) -> None:
                 # Defensive: Rendering/Events dürfen die Demo nicht crashen
                 log.debug("Event processing failed (tick %d): %s", t, event_err)
 
-        # Zusammenfassung relevanter BB-Fakten für die Nachvollziehbarkeit
-        bb = worker.blackboard
+        # Zusammenfassung relevanter BB-Fakten für alle Agenten
         summary_keys = [
             "position", "in_nest", "at_entry", "food_detected", "food_position",
             "individual_stomach", "individual_hungry",
             "social_stomach", "social_hungry", "has_moved"
         ]
-        snapshot = {k: bb.get(k) for k in summary_keys}
-        log.info("Tick %d Ergebnis=%s BB-Snapshot=%s", t, result, snapshot)
+        
+        # Log each agent's state
+        for agent in all_agents:
+            bb = agent.blackboard
+            snapshot = {k: bb.get(k) for k in summary_keys}
+            agent_type = type(agent).__name__
+            log.info("Tick %d %s[%d] BB-Snapshot=%s", t, agent_type, agent.id, snapshot)
+        
+        # Log overall results
+        log.info("Tick %d Results=%s", t, results)
 
         # Ereignisse pro Tick zuverlässig flushen (EventLogger ist threadsicher)
         try:

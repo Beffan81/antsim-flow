@@ -28,79 +28,13 @@ from ..behavior.bt import BehaviorEngine
 from ..core.worker import Worker
 from ..core.queen import Queen
 from ..core.agents import AgentFactory
+from ..core.environment import Environment
+from ..core.nest_builder import NestBuilder
 from ..io.config_loader import load_behavior_tree
 from ..core.engine.pheromones import PheromoneField  # Double-Buffer Engine
 from ..io.logging_setup import setup_logging, set_namespace_levels
 from ..io.event_logger import configure_event_logger, get_event_logger
 from .renderer import Renderer  # NEU: Renderer-Integration (Step 10)
-
-
-# ----------------- Minimal Environment -----------------
-
-class _Cell:
-    """Kleine Zelle mit Typ, optionaler Nahrung, Pheromonen und optionaler Belegung (ant)."""
-    __slots__ = ("x", "y", "cell_type", "food", "pheromone_level", "pheromones", "_owner", "ant")
-
-    def __init__(self, x: int, y: int, owner: Optional["DemoEnvironment"] = None, cell_type: str = "empty"):
-        self.x = x
-        self.y = y
-        self.cell_type = cell_type
-        self.food = None
-        self.pheromone_level = 0
-        # Freiform-Container für einfache Demos (Legacy-kompatible Ansicht)
-        self.pheromones: Dict[str, int] = {}
-        # Back-Reference zur Environment, um PheromoneField-Deposits mitzunehmen
-        self._owner = owner
-        # Zellenbelegung für Kollisionserkennung / Sensoren
-        self.ant = None  # vom Executor gesetzt/geräumt
-
-    def add_pheromone(self, pheromone_type: str, strength: int) -> None:
-        """Zell-lokale Pheromonablage; spiegelt zusätzlich in PheromoneField (falls vorhanden)."""
-        if pheromone_type not in self.pheromones:
-            self.pheromones[pheromone_type] = 0
-        self.pheromones[pheromone_type] += int(strength)
-        # Legacy-Feld für einfache Renderer: Summiere generisch
-        self.pheromone_level += int(strength)
-        # Neues System: Double-Buffer Field befüllen (staging)
-        env = self._owner
-        if env and hasattr(env, "pheromones") and isinstance(env.pheromones, PheromoneField):
-            env.pheromones.deposit(pheromone_type, self.x, self.y, float(strength))
-
-
-class DemoEnvironment:
-    """Minimal-Environment für Sensor-/Trigger-/Pheromon-Demo."""
-    def __init__(self, width: int = 20, height: int = 20, entries: Optional[List[Tuple[int, int]]] = None):
-        self.width = width
-        self.height = height
-        self.grid: List[List[_Cell]] = [[_Cell(x, y, owner=self) for x in range(width)] for y in range(height)]
-        self.entry_positions: List[Tuple[int, int]] = entries or [(1, 1)]
-        for ex, ey in self.entry_positions:
-            self.grid[ey][ex].cell_type = "e"  # Eingang
-        # Nest-Kern (ein paar Zellen) zur Demonstration
-        for ny in range(2, 5):
-            for nx in range(2, 5):
-                self.grid[ny][nx].cell_type = "nest"
-        self.cycle_count = 0
-
-        # Double-Buffer Pheromon-Engine mit sinnvollen Defaults
-        self.pheromones = PheromoneField(
-            width=self.width,
-            height=self.height,
-            types=["food", "hunger", "nest", "brood"],
-            evaporation=0.02,
-            alpha=0.12,
-            allow_dynamic_types=True,
-        )
-
-    def get_ant_at_position(self, x: int, y: int):
-        """Liefert die Ameise an einer Position; unterstützt Executor-Kollisionserkennung/Sensoren."""
-        if 0 <= x < self.width and 0 <= y < self.height:
-            return self.grid[y][x].ant
-        return None
-
-    def pheromones_tick(self) -> Dict[str, Dict[str, float]]:
-        """Diffusion + Verdunstung + Swap; liefert kompakte Summary."""
-        return self.pheromones.update_and_swap()
 
 
 # ----------------- Demo Runner -----------------
@@ -224,9 +158,26 @@ def run_demo(ticks: int = 100) -> None:
     log.info("Plugins geladen: steps=%s triggers=%s sensors=%s",
              pm.list_steps(), pm.list_triggers(), pm.list_sensors())
 
-    # 2) Environment + Colony (1 Queen + 2 Workers)
-    env = DemoEnvironment()
+    # 2) Environment mit Standard-Nest erstellen
+    env = Environment(width=40, height=30)
+    
+    # Nest-Layout erstellen
+    nest_builder = NestBuilder()
+    entry_x, entry_y = nest_builder.build_standard_nest(env, center=True)
+    log.info("Standard nest built with entry at (%d, %d)", entry_x, entry_y)
+    
+    # 3) Colony (1 Queen + 2 Workers) mit korrekter Positionierung
     queens, workers = build_demo_colony()
+    
+    # Queen im Nest-Zentrum platzieren
+    nest_center = nest_builder.get_nest_center(env.width, env.height)
+    queens[0].position = nest_center
+    
+    # Workers nahe der Entry platzieren
+    worker_positions = [(entry_x, entry_y + 1), (entry_x + 1, entry_y + 1)]
+    for i, worker in enumerate(workers):
+        if i < len(worker_positions):
+            worker.position = worker_positions[i]
     
     # Set queen reference in environment for queen_steps to work
     env.queen = queens[0] if queens else None
@@ -234,16 +185,14 @@ def run_demo(ticks: int = 100) -> None:
     # Get all agents for processing
     all_agents = queens + workers
     
-    # WICHTIG: Startbelegung im Grid setzen, damit Kollisionserkennung/Sensoren korrekt arbeiten
+    # WICHTIG: Agents in Environment registrieren für korrekte Kollisionserkennung/Sensoren
     for agent in all_agents:
         try:
-            x, y = agent.position
-            if 0 <= x < env.width and 0 <= y < env.height:
-                env.grid[y][x].ant = agent
-                log.debug("initial_occupancy_set agent=%s type=%s pos=%s", 
-                         agent.id, type(agent).__name__, agent.position)
+            env.add_ant(agent)
+            log.debug("Agent registered: id=%s type=%s pos=%s", 
+                     agent.id, type(agent).__name__, agent.position)
         except Exception as e:
-            log.warning("could_not_set_initial_occupancy agent=%s err=%s", 
+            log.warning("Could not register agent id=%s: %s", 
                        getattr(agent, 'id', 'unknown'), e)
 
     # 3) BT aus Config bauen (validiert Step-/Trigger-Namen)
@@ -309,7 +258,9 @@ def run_demo(ticks: int = 100) -> None:
             "tick": t, 
             "queens": len(queens),
             "workers": len(workers),
-            "results": results
+            "results": results,
+            "nest_center": nest_center,
+            "entry": (entry_x, entry_y)
         }
         try:
             renderer.draw(

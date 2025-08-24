@@ -43,10 +43,23 @@ log = logging.getLogger(__name__)
 # ---------- Pydantic Schemata ----------
 
 class EnvironmentConfig(BaseModel):
-    """Minimal-Umgebungsschema (erweiterbar)."""
+    """Umgebungsschema mit Nest-Konfiguration."""
     width: int = Field(20, ge=1)
     height: int = Field(20, ge=1)
     entry_positions: Optional[List[Tuple[int, int]]] = None
+    
+    # Nest-Konfiguration
+    nest_type: str = Field("standard", description="Nest type: 'standard', 'custom', 'none'")
+    nest_size: Optional[Tuple[int, int]] = Field(None, description="Custom nest size as (width, height)")
+    center_nest: bool = Field(True, description="Whether to center the nest on the field")
+    
+    @field_validator("nest_type")
+    @classmethod
+    def validate_nest_type(cls, v: str) -> str:
+        valid_types = {"standard", "custom", "none"}
+        if v not in valid_types:
+            raise ValueError(f"nest_type must be one of {valid_types}, got '{v}'")
+        return v
 
 
 class AgentConfig(BaseModel):

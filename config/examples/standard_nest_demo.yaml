@@ -1,0 +1,47 @@
+environment:
+  width: 40
+  height: 30
+  nest_type: "standard"
+  center_nest: true
+
+agent:
+  queen_count: 1
+  worker_count: 2
+  queen_config:
+    energy: 200
+    max_energy: 200
+    social_stomach: 150
+    social_stomach_capacity: 150
+    egg_laying_interval: 10
+    max_eggs: 100
+    hunger_threshold: 75
+  worker_config:
+    energy: 100
+    max_energy: 100
+    stomach_capacity: 100
+    social_stomach_capacity: 100
+    hunger_threshold: 50
+
+behavior_tree:
+  root:
+    type: "selector"
+    name: "Root"
+    children:
+      - type: "sequence"
+        name: "ForageSequence"
+        children:
+          - type: "condition"
+            name: "ShouldForage"
+            condition:
+              triggers: ["social_hungry", "not_in_nest"]
+              logic: "AND"
+          - type: "step"
+            name: "Move"
+            step:
+              name: "example_move"
+              params: {}
+      - type: "step"
+        name: "Idle"
+        step:
+          name: "example_wait"
+          params: {}

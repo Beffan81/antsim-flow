@@ -25,6 +25,10 @@ from .engine.pheromones import PheromoneField
 
 log = logging.getLogger(__name__)
 
+@dataclass
+class Food:
+    amount: int = 0
+
 
 @dataclass
 class Cell:
@@ -235,9 +239,26 @@ class Environment:
                     count += 1
         return count
 
-    def add_food(self, position: Tuple[int, int], food_obj: Any) -> None:
-        """Optional: Food-Objekt in eine Zelle legen (tolerant)."""
-        x, y = int(position[0]), int(position[1])
+    def add_food(self, *args) -> None:
+        """Add food to a cell.
+        Accepts:
+          - add_food((x, y), food_obj)
+          - add_food(x, y, amount_or_food_obj)
+        Where food_obj must have an 'amount' attribute. If a number is given, a Food(amount) is created.
+        """
+        if len(args) == 2:
+            position, food_obj = args
+            x, y = int(position[0]), int(position[1](https://file://neuer_code.txt))
+        elif len(args) == 3:
+            x, y, amt_or_obj = args
+            x, y = int(x), int(y)
+            if isinstance(amt_or_obj, (int, float)):
+                food_obj = Food(amount=int(amt_or_obj))
+            else:
+                food_obj = amt_or_obj
+        else:
+            raise TypeError("add_food expects (position, food_obj) or (x, y, amount_or_food_obj)")
+            
         if self._in_bounds(x, y):
             self.grid[y][x].food = food_obj
 

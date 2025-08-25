@@ -248,7 +248,7 @@ class Environment:
         """
         if len(args) == 2:
             position, food_obj = args
-            x, y = int(position[0]), int(position[1](https://file://neuer_code.txt))
+            x, y = int(position[0]), int(position[1])
         elif len(args) == 3:
             x, y, amt_or_obj = args
             x, y = int(x), int(y)

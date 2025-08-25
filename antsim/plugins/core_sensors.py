@@ -74,7 +74,7 @@ def bb_env_flags_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
         at_entry = (x, y) == tuple(environment.entry_position)
     cell = _cell(environment, x, y)
     if cell is not None and hasattr(cell, "cell_type"):
-        in_nest = cell.cell_type in ("nest", "e")
+        in_nest = cell.cell_type == "nest"  # Entry cells ("e") are NOT considered "in nest"
     logger.debug("sensor=bb_env_flags at_entry=%s in_nest=%s pos=(%s,%s)", at_entry, in_nest, x, y)
     return {"at_entry": at_entry, "in_nest": in_nest}
 

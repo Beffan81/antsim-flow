@@ -257,6 +257,19 @@ class TaskConfig(BaseModel):
         return lv
 
 
+class FoodSourceConfig(BaseModel):
+    """Konfiguration für Futterquellen."""
+    position: Tuple[int, int] = Field(..., description="Position der Futterquelle als (x, y)")
+    amount: int = Field(..., ge=1, description="Menge der Nahrung an dieser Quelle")
+    
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("amount must be greater than 0")
+        return v
+
+
 class SimulationConfig(BaseModel):
     """Gesamtkonfiguration (optional: nur BT nutzen)."""
     environment: Optional[EnvironmentConfig] = None
@@ -264,6 +277,8 @@ class SimulationConfig(BaseModel):
     behavior_tree: BehaviorTreeConfig
     # Optional: Task-Liste für spätere Nutzung/Kompatibilität
     tasks: Optional[List[TaskConfig]] = None
+    # Optional: Futterquellen
+    food_sources: Optional[List[FoodSourceConfig]] = None
 
 
 # ---------- Loader-/Validierungsfunktionen ----------

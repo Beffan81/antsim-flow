@@ -30,7 +30,7 @@ from ..core.queen import Queen
 from ..core.agents import AgentFactory
 from ..core.environment import Environment
 from ..core.nest_builder import NestBuilder
-from ..io.config_loader import load_behavior_tree
+from ..io.config_loader import load_behavior_tree, load_simulation_config
 from ..core.engine.pheromones import PheromoneField  # Double-Buffer Engine
 from ..io.logging_setup import setup_logging, set_namespace_levels
 from ..io.event_logger import configure_event_logger, get_event_logger
@@ -124,27 +124,64 @@ def _resolve_bt_source(argv: List[str]) -> Optional[str]:
     return None
 
 
-def _load_bt_root(pm: PluginManager, argv: List[str]):
+def _load_simulation_config(pm: PluginManager, argv: List[str]):
     """
-    Lädt den Behavior Tree Root:
+    Lädt die vollständige Simulation-Konfiguration:
       - aus Datei (YAML/JSON) falls angegeben (CLI/ENV),
       - sonst aus der eingebauten JSON-Fallback-Config.
-    Liefert den Root-Knoten oder beendet mit Fehler bei ungültiger externen Config.
+    Liefert (root_node, simulation_config) oder beendet mit Fehler bei ungültiger externen Config.
     """
     log = logging.getLogger(__name__)
     cfg_path = _resolve_bt_source(argv)
     if cfg_path:
-        log.info("Lade Behavior Tree aus Datei: %s", cfg_path)
+        log.info("Lade Simulation-Konfiguration aus Datei: %s", cfg_path)
         try:
-            root = load_behavior_tree(pm, cfg_path)
-            log.info("Behavior Tree erfolgreich geladen (extern)")
-            return root
+            root, sim_config = load_simulation_config(pm, cfg_path)
+            log.info("Simulation-Konfiguration erfolgreich geladen (extern)")
+            return root, sim_config
         except Exception as e:
-            log.error("Fehler beim Laden/Validieren der BT-Konfiguration '%s': %s", cfg_path, e, exc_info=True)
+            log.error("Fehler beim Laden/Validieren der Simulation-Konfiguration '%s': %s", cfg_path, e, exc_info=True)
             sys.exit(3)
     # Fallback: eingebauter Minimal-Tree
-    log.info("Keine externe BT-Konfiguration angegeben; nutze Fallback")
-    return load_behavior_tree(pm, BT_CONFIG_JSON)
+    log.info("Keine externe Simulation-Konfiguration angegeben; nutze Fallback")
+    root = load_behavior_tree(pm, BT_CONFIG_JSON)
+    return root, None
+
+
+def initialize_food_sources(env: Environment, sim_config) -> None:
+    """Initialisiert Futterquellen basierend auf der Konfiguration."""
+    log = logging.getLogger(__name__)
+    
+    if not sim_config or not sim_config.food_sources:
+        # Standard-Futterquellen wenn keine Konfiguration vorhanden
+        default_sources = [
+            (5, 5, 200),
+            (35, 25, 150), 
+            (20, 5, 100)
+        ]
+        for x, y, amount in default_sources:
+            # Prüfe ob Position innerhalb der Environment-Grenzen liegt
+            if 0 <= x < env.width and 0 <= y < env.height:
+                env.add_food(x, y, amount)
+                log.info("Standard-Futterquelle hinzugefügt: pos=(%d,%d) amount=%d", x, y, amount)
+        return
+    
+    # Futterquellen aus Konfiguration
+    count = 0
+    for food_config in sim_config.food_sources:
+        x, y = food_config.position
+        amount = food_config.amount
+        
+        # Validiere Position
+        if not (0 <= x < env.width and 0 <= y < env.height):
+            log.warning("Futterquelle ignoriert (außerhalb der Grenzen): pos=(%d,%d)", x, y)
+            continue
+            
+        env.add_food(x, y, amount)
+        count += 1
+        log.info("Futterquelle hinzugefügt: pos=(%d,%d) amount=%d", x, y, amount)
+    
+    log.info("Futterquellen-Initialisierung abgeschlossen: %d Quellen hinzugefügt", count)
 
 
 def run_demo(ticks: int = 100) -> None:
@@ -195,9 +232,12 @@ def run_demo(ticks: int = 100) -> None:
             log.warning("Could not register agent id=%s: %s", 
                        getattr(agent, 'id', 'unknown'), e)
 
-    # 3) BT aus Config bauen (validiert Step-/Trigger-Namen)
-    root = _load_bt_root(pm, sys.argv)
+    # 3) BT aus Config bauen (validiert Step-/Trigger-Namen) und Futterquellen initialisieren
+    root, sim_config = _load_simulation_config(pm, sys.argv)
     log.info("Behavior Tree erfolgreich aus Config geladen und gebaut")
+    
+    # Futterquellen initialisieren
+    initialize_food_sources(env, sim_config)
 
     # 4) Engine + Renderer
     engine = BehaviorEngine(pm, root)

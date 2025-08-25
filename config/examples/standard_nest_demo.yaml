@@ -45,3 +45,11 @@ behavior_tree:
         step:
           name: "example_wait"
           params: {}
+
+food_sources:
+  - position: [5, 5]
+    amount: 200
+  - position: [35, 25] 
+    amount: 150
+  - position: [20, 5]
+    amount: 100

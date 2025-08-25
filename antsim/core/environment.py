@@ -90,6 +90,9 @@ class Environment:
 
         # Ant-Registry (id -> obj)
         self.ant_registry: Dict[int, Any] = {}
+        
+        # Brood-Registry (id -> obj)
+        self.brood_registry: Dict[int, Any] = {}
 
         # Simulationszählung (Tick/Cycle)
         self.cycle_count: int = 0
@@ -243,3 +246,60 @@ class Environment:
         x, y = int(position[0]), int(position[1])
         if self._in_bounds(x, y):
             self.grid[y][x].food = None
+
+    # --------------- Brood Management ---------------
+    
+    def add_brood(self, brood: Any) -> None:
+        """Register brood and occupy cell (similar to add_ant)."""
+        brood_id = getattr(brood, "id", None)
+        pos = getattr(brood, "position", None)
+        if not isinstance(brood_id, int):
+            raise ValueError("Brood must have integer 'id'")
+        if not (isinstance(pos, (tuple, list)) and len(pos) == 2):
+            raise ValueError("Brood must have 2-tuple/list 'position'")
+
+        x, y = int(pos[0]), int(pos[1])
+        if not self._in_bounds(x, y):
+            raise ValueError(f"Brood position out of bounds: {pos}")
+
+        # idempotent occupancy update
+        prev = self.brood_registry.get(brood_id)
+        if prev is brood:
+            # ensure occupancy is correct (brood shares cell space with ants for now)
+            return
+
+        # remove previous occupancy if id reused
+        if prev is not None:
+            prev_pos = getattr(prev, "position", None)
+            if isinstance(prev_pos, (tuple, list)) and len(prev_pos) == 2:
+                px, py = int(prev_pos[0]), int(prev_pos[1])
+                # Brood doesn't block cells like ants, but we track them
+                pass
+
+        self.brood_registry[brood_id] = brood
+        log.info("brood_registered id=%s pos=%s", brood_id, (x, y))
+    
+    def remove_brood(self, brood_id: int) -> None:
+        """Remove brood from registry."""
+        brood = self.brood_registry.pop(int(brood_id), None)
+        if brood is None:
+            return
+        log.info("brood_removed id=%s", brood_id)
+    
+    def get_brood_at_position(self, x: int, y: int) -> List[Any]:
+        """Get all brood at given position."""
+        if not self._in_bounds(int(x), int(y)):
+            return []
+        
+        broods = []
+        for brood in self.brood_registry.values():
+            brood_pos = getattr(brood, "position", None)
+            if isinstance(brood_pos, (tuple, list)) and len(brood_pos) == 2:
+                bx, by = int(brood_pos[0]), int(brood_pos[1])
+                if bx == x and by == y:
+                    broods.append(brood)
+        return broods
+    
+    def get_brood_by_id(self, brood_id: int) -> Optional[Any]:
+        """Registry-lookup for Brood-ID."""
+        return self.brood_registry.get(int(brood_id))

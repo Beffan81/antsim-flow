@@ -78,15 +78,96 @@ class Queen:
         self.blackboard.set('has_moved', False)
         # Other cycle resets can be added by sensors/plugins
     
+    def process_energy_cycle(self, current_tick: int) -> Dict[str, Any]:
+        """Process energy conversion, loss, and hunger signaling.
+        
+        Returns:
+            Dict with processing results and intents
+        """
+        results = {
+            'energy_converted': 0,
+            'energy_lost': 0,
+            'stomach_depleted': 0,
+            'is_alive': True,
+            'is_signaling_hunger': False,
+            'intents': []
+        }
+        
+        # Get current state
+        energy = self.blackboard.get('energy', 0)
+        max_energy = self.blackboard.get('max_energy', 200)
+        stomach = self.blackboard.get('social_stomach', 0)
+        
+        conversion_rate = self._config.get('energy_conversion_rate', 8)
+        loss_rate = self._config.get('energy_loss_rate', 3)
+        depletion_rate = self._config.get('stomach_depletion_rate', 5)
+        
+        # Energy conversion from stomach
+        if stomach > 0:
+            conversion_amount = min(stomach, conversion_rate)
+            energy_gain = min(conversion_amount, max_energy - energy)
+            
+            self.blackboard.set('energy', energy + energy_gain)
+            self.blackboard.set('social_stomach', stomach - conversion_amount)
+            
+            results['energy_converted'] = energy_gain
+            results['stomach_depleted'] = conversion_amount
+            
+        # Energy loss when stomach empty
+        else:
+            energy_loss = min(energy, loss_rate)
+            new_energy = energy - energy_loss
+            self.blackboard.set('energy', new_energy)
+            
+            results['energy_lost'] = energy_loss
+            
+            # Death check
+            if new_energy <= 0:
+                results['is_alive'] = False
+                logger.info(f"Queen {self.id} died from starvation at tick {current_tick}")
+                return results
+        
+        # Hunger signaling via pheromones
+        current_energy = self.blackboard.get('energy', 0)
+        if current_energy < max_energy:
+            # Import here to avoid circular imports
+            try:
+                from .executor import DepositPheromoneIntent
+                
+                strength = self._config.get('hunger_pheromone_strength', 3)
+                hunger_intent = DepositPheromoneIntent(ptype="hunger", strength=strength)
+                results['intents'].append(hunger_intent)
+                results['is_signaling_hunger'] = True
+                
+                self.blackboard.set('is_signaling_hunger', True)
+                
+            except ImportError:
+                # Fallback to dict format
+                results['intents'].append({
+                    "type": "PHEROMONE", 
+                    "payload": {"ptype": "hunger", "strength": 3}
+                })
+                results['is_signaling_hunger'] = True
+        else:
+            self.blackboard.set('is_signaling_hunger', False)
+        
+        return results
+
     def can_lay_egg(self, current_tick: int) -> bool:
-        """Check if queen can lay an egg this tick."""
+        """Check if queen can lay an egg this tick (requires 100% energy)."""
         last_egg = self.blackboard.get('last_egg_tick', 0)
         interval = self.blackboard.get('egg_laying_interval', 10)
         eggs_laid = self.blackboard.get('eggs_laid', 0)
         max_eggs = self.blackboard.get('max_eggs', 100)
         
+        # NEW: Require 100% energy for egg laying
+        energy = self.blackboard.get('energy', 0)
+        max_energy = self.blackboard.get('max_energy', 200)
+        has_full_energy = energy >= max_energy
+        
         return (current_tick - last_egg >= interval and 
-                eggs_laid < max_eggs)
+                eggs_laid < max_eggs and
+                has_full_energy)
     
     def lay_egg(self, current_tick: int) -> bool:
         """Lay an egg if possible."""

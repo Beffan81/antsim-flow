@@ -15,12 +15,36 @@ agent:
     egg_laying_interval: 10
     max_eggs: 100
     hunger_threshold: 75
+    # New energy system parameters
+    energy_conversion_rate: 8
+    energy_loss_rate: 3
+    stomach_depletion_rate: 5
+    hunger_pheromone_strength: 3
   worker_config:
     energy: 100
     max_energy: 100
     stomach_capacity: 100
     social_stomach_capacity: 100
     hunger_threshold: 50
+
+# New brood configuration
+brood:
+  initial_energy: 50
+  max_energy: 100
+  initial_stomach: 0
+  stomach_capacity: 80
+  maturation_time: 50
+  energy_conversion_rate: 5
+  energy_loss_rate: 2
+  stomach_depletion_rate: 3
+  hunger_pheromone_strength: 2
+
+# Queen energy system configuration  
+queen_energy:
+  energy_conversion_rate: 8
+  energy_loss_rate: 3
+  stomach_depletion_rate: 5
+  hunger_pheromone_strength: 3
 
 behavior_tree:
   root:

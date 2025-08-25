@@ -285,10 +285,99 @@ def run_demo(ticks: int = 100) -> None:
             agent_type = "Queen" if hasattr(agent, 'egg_laying_interval') else "Worker"
             results.append((agent.id, agent_type, result))
         
-        # Queen egg laying logic
+        # Process queen energy and egg laying lifecycle
         for queen in queens:
+            # Process energy conversion and hunger signaling
+            energy_result = queen.process_energy_cycle(t)
+            if not energy_result['is_alive']:
+                log.warning("Queen %s died at tick %d", queen.id, t)
+                queens.remove(queen)
+                env.remove_ant(queen.id)
+                continue
+            
+            # Handle queen's pheromone intents from energy processing
+            if energy_result.get('intents'):
+                for intent in energy_result['intents']:
+                    if hasattr(intent, 'ptype') and intent.ptype == "hunger":
+                        # Deposit hunger pheromone at queen's position
+                        qx, qy = queen.position
+                        if hasattr(env, 'grid') and 0 <= qx < env.width and 0 <= qy < env.height:
+                            env.grid[qy][qx].add_pheromone("hunger", intent.strength)
+            
+            # Egg laying if conditions are met (100% energy required)
             if queen.can_lay_egg(t):
-                queen.lay_egg(t)
+                success = queen.lay_egg(t)
+                if success:
+                    # Create new brood at queen's position
+                    from antsim.core.brood import Brood
+                    brood_id = len(env.brood_registry) + 1000  # Offset brood IDs
+                    brood_config = {
+                        'initial_energy': 50,
+                        'max_energy': 100,
+                        'maturation_time': 30,  # Shorter for demo
+                        'energy_conversion_rate': 5,
+                        'energy_loss_rate': 2,
+                        'hunger_pheromone_strength': 2
+                    }
+                    new_brood = Brood(brood_id, queen.position, brood_config)
+                    new_brood.blackboard.set('created_tick', t)
+                    env.add_brood(new_brood)
+                    log.info("Queen %s laid egg -> Brood %s at tick %d", queen.id, brood_id, t)
+        
+        # Process brood lifecycle
+        brood_to_remove = []
+        brood_to_mature = []
+        
+        for brood in list(env.brood_registry.values()):
+            # Process brood energy cycle
+            energy_result = brood.process_energy_cycle(t)
+            if not energy_result['is_alive']:
+                log.info("Brood %s died at tick %d", brood.id, t)
+                brood_to_remove.append(brood.id)
+                continue
+            
+            # Handle brood's pheromone intents from energy processing
+            if energy_result.get('intents'):
+                for intent in energy_result['intents']:
+                    if hasattr(intent, 'ptype') and intent.ptype == "hunger":
+                        # Deposit hunger pheromone at brood's position
+                        bx, by = brood.position
+                        if hasattr(env, 'grid') and 0 <= bx < env.width and 0 <= by < env.height:
+                            env.grid[by][bx].add_pheromone("hunger", intent.strength)
+            
+            # Growth if at full energy
+            if brood.can_grow():
+                brood.grow(t)
+            
+            # Check for maturation
+            if brood.can_mature(t):
+                brood_to_mature.append(brood)
+        
+        # Remove dead brood
+        for brood_id in brood_to_remove:
+            env.remove_brood(brood_id)
+        
+        # Mature brood into workers
+        for brood in brood_to_mature:
+            from antsim.core.agents import Agent  # Import worker class
+            worker_id = len(env.ant_registry) + 2000  # Offset worker IDs
+            worker_config = {
+                'energy': 100,
+                'max_energy': 100,
+                'stomach_capacity': 100,
+                'social_stomach_capacity': 100,
+                'hunger_threshold': 50
+            }
+            new_worker = Agent(worker_id, brood.position, worker_config)
+            
+            # Add to environment and workers list
+            env.add_ant(new_worker)
+            workers.append(new_worker)
+            all_agents.append(new_worker)
+            
+            # Remove brood
+            env.remove_brood(brood.id)
+            log.info("Brood %s matured into Worker %s at tick %d", brood.id, worker_id, t)
 
         # Pheromon-Engine aktualisieren (Diffusion/Verdunstung/Swap einmal pro Tick)
         ph_summary = env.pheromones_tick()
@@ -300,6 +389,7 @@ def run_demo(ticks: int = 100) -> None:
             "tick": t, 
             "queens": len(queens),
             "workers": len(workers),
+            "brood": len(env.brood_registry),
             "results": results,
             "nest_center": nest_center,
             "entry": (entry_x, entry_y)
@@ -309,7 +399,7 @@ def run_demo(ticks: int = 100) -> None:
                 environment=env, 
                 ants=workers,  # Workers as ants 
                 queen=queens[0] if queens else None,  # First queen
-                brood=[], 
+                brood=list(env.brood_registry.values()),  # Pass brood list
                 info=info_overlay
             )
             renderer.flip()

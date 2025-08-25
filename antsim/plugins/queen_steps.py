@@ -271,31 +271,40 @@ def feed_queen_step(worker: Any, environment: Any, amount: Optional[int] = None,
 # ---------- Queen-specific steps ----------
 
 def signal_hunger_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
-    """Queen signals hunger without moving.
+    """Queen signals hunger via pheromones (3-cell radius).
     
-    This step allows the queen to signal her hunger state to nearby workers
-    without any movement. Workers can detect this via their sensors.
-    
-    Returns:
-        SUCCESS: Always succeeds, signaling is passive
+    Used when queen needs food from workers.
+    Deposits hunger pheromones at current position.
+    Always returns SUCCESS with pheromone intent.
     """
-    qid = getattr(worker, 'id', '?')
-    log.debug("step=signal_hunger queen=%s (passive signaling)", qid)
+    wid = _bb_get(worker, 'id', '?')
     
-    # Set hunger signaling flag on blackboard for workers to detect
-    bb = getattr(worker, 'blackboard', None)  
-    if bb:
-        bb.set('signaling_hunger', True)
-        log.debug("step=signal_hunger queen=%s set signaling_hunger flag", qid)
+    # Set hunger signaling flag
+    if hasattr(worker, 'blackboard') and hasattr(worker.blackboard, 'set'):
+        worker.blackboard.set('is_signaling_hunger', True)
     
-    return {"status": "SUCCESS"}
+    # Create pheromone intent for hunger signaling
+    intents = []
+    try:
+        from ..core.executor import DepositPheromoneIntent
+        hunger_intent = DepositPheromoneIntent(ptype="hunger", strength=3)
+        intents.append(hunger_intent)
+    except ImportError:
+        # Fallback to dict format
+        intents.append({
+            "type": "PHEROMONE",
+            "payload": {"ptype": "hunger", "strength": 3}
+        })
+    
+    log.info("step=signal_hunger queen=%s status=signaling_pheromones", wid)
+    return {"status": "SUCCESS", "intents": intents}
 
 
 def idle_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
     """Queen remains idle, waiting passively.
     
     This is the default queen behavior when not hungry.
-    The queen stays in place and waits.
+    The queen stays in place and waits, clearing hunger signaling.
     
     Returns:
         SUCCESS: Always succeeds
@@ -303,9 +312,9 @@ def idle_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
     qid = getattr(worker, 'id', '?')
     log.debug("step=idle queen=%s (no action)", qid)
     
-    # Ensure signaling_hunger is cleared when idle
+    # Ensure hunger signaling is cleared when idle
     bb = getattr(worker, 'blackboard', None)
     if bb:
-        bb.set('signaling_hunger', False)
+        bb.set('is_signaling_hunger', False)
     
     return {"status": "SUCCESS"}

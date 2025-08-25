@@ -62,6 +62,31 @@ class EnvironmentConfig(BaseModel):
         return v
 
 
+class QueenEnergyConfig(BaseModel):
+    """Queen energy system configuration."""
+    energy_conversion_rate: int = Field(8, ge=1, description="Energy gained per stomach unit per tick")
+    energy_loss_rate: int = Field(3, ge=0, description="Energy lost per tick when stomach empty")
+    stomach_depletion_rate: int = Field(5, ge=1, description="Stomach units consumed per tick")
+    hunger_pheromone_strength: int = Field(3, ge=1, description="Strength of hunger pheromone signal")
+
+
+class BroodConfig(BaseModel):
+    """Brood (egg/larvae) configuration."""
+    initial_energy: int = Field(50, ge=0, description="Starting energy for new brood")
+    max_energy: int = Field(100, ge=1, description="Maximum energy for brood")
+    initial_stomach: int = Field(0, ge=0, description="Starting stomach contents")
+    stomach_capacity: int = Field(80, ge=1, description="Maximum stomach capacity")
+    
+    # Growth and maturation
+    maturation_time: int = Field(50, ge=1, description="Ticks needed to mature into worker")
+    
+    # Energy processing
+    energy_conversion_rate: int = Field(5, ge=1, description="Energy gained per stomach unit per tick")
+    energy_loss_rate: int = Field(2, ge=0, description="Energy lost per tick when stomach empty")
+    stomach_depletion_rate: int = Field(3, ge=1, description="Stomach units consumed per tick")
+    hunger_pheromone_strength: int = Field(2, ge=1, description="Strength of hunger pheromone signal")
+
+
 class AgentConfig(BaseModel):
     """Configuration for both queens and workers."""
     # Legacy support: total agent count (deprecated)
@@ -271,14 +296,16 @@ class FoodSourceConfig(BaseModel):
 
 
 class SimulationConfig(BaseModel):
-    """Gesamtkonfiguration (optional: nur BT nutzen)."""
-    environment: Optional[EnvironmentConfig] = None
-    agent: Optional[AgentConfig] = None
+    """Vollständige Simulation-Konfiguration."""
+    environment: EnvironmentConfig = Field(default_factory=EnvironmentConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
     behavior_tree: BehaviorTreeConfig
-    # Optional: Task-Liste für spätere Nutzung/Kompatibilität
     tasks: Optional[List[TaskConfig]] = None
-    # Optional: Futterquellen
     food_sources: Optional[List[FoodSourceConfig]] = None
+    
+    # New energy system configurations
+    queen_energy: Optional[QueenEnergyConfig] = Field(default_factory=QueenEnergyConfig)
+    brood: Optional[BroodConfig] = Field(default_factory=BroodConfig)
 
 
 # ---------- Loader-/Validierungsfunktionen ----------

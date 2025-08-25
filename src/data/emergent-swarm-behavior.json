@@ -1,0 +1,242 @@
+{
+  "name": "EmergentSwarmBehavior",
+  "description": "Emergent swarm behavior based on simple local rules: direct feeding, trail reinforcement, and hunger response",
+  "root": {
+    "type": "selector",
+    "id": "root",
+    "name": "EmergentBehaviorRoot",
+    "children": [
+      {
+        "type": "sequence",
+        "id": "hunger_response_sequence",
+        "name": "HungerResponseSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_hunger_pheromone",
+            "name": "CheckHungerPheromone",
+            "triggers": ["hunger_pheromone_detected"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "move_to_hunger_step",
+            "name": "MoveToHungerSource",
+            "stepName": "move_to_hunger_source",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "id": "direct_contact_feeding",
+        "name": "DirectContactFeeding",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_direct_feeding",
+            "name": "CheckDirectFeedingOpportunity",
+            "triggers": ["direct_feeding_opportunity"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "auto_direct_feed_step",
+            "name": "AutoDirectFeed",
+            "stepName": "auto_direct_feed",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "id": "social_foraging_sequence",
+        "name": "SocialForagingSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_social_hungry",
+            "name": "CheckSocialHungry",
+            "triggers": ["social_stomach_empty"],
+            "logic": "AND"
+          },
+          {
+            "type": "selector",
+            "id": "foraging_strategy",
+            "name": "ForagingStrategy",
+            "children": [
+              {
+                "type": "sequence",
+                "id": "leave_nest_sequence",
+                "name": "LeaveNestSequence",
+                "children": [
+                  {
+                    "type": "condition",
+                    "id": "check_in_nest",
+                    "name": "CheckInNest",
+                    "triggers": ["in_nest"],
+                    "logic": "AND"
+                  },
+                  {
+                    "type": "step",
+                    "id": "leave_nest_step",
+                    "name": "LeaveNest",
+                    "stepName": "leave_nest_advanced",
+                    "params": {}
+                  }
+                ]
+              },
+              {
+                "type": "sequence",
+                "id": "follow_pheromone_sequence",
+                "name": "FollowPheromoneSequence",
+                "children": [
+                  {
+                    "type": "condition",
+                    "id": "check_pheromone_available",
+                    "name": "CheckPheromoneAvailable",
+                    "triggers": ["pheromone_gradient_available"],
+                    "logic": "AND"
+                  },
+                  {
+                    "type": "step",
+                    "id": "follow_gradient_step",
+                    "name": "FollowGradient",
+                    "stepName": "follow_gradient",
+                    "params": {}
+                  }
+                ]
+              },
+              {
+                "type": "sequence",
+                "id": "direct_to_food_sequence",
+                "name": "DirectToFoodSequence",
+                "children": [
+                  {
+                    "type": "condition",
+                    "id": "check_food_nearby",
+                    "name": "CheckFoodNearby",
+                    "triggers": ["food_available_nearby"],
+                    "logic": "AND"
+                  },
+                  {
+                    "type": "step",
+                    "id": "move_to_food_step",
+                    "name": "MoveToFood",
+                    "stepName": "move_to_food_advanced",
+                    "params": {}
+                  }
+                ]
+              },
+              {
+                "type": "step",
+                "id": "spiral_search_step",
+                "name": "SpiralSearch",
+                "stepName": "spiral_search",
+                "params": {}
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "id": "food_collection_sequence",
+        "name": "FoodCollectionSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_food_detected",
+            "name": "CheckFoodDetected",
+            "triggers": ["food_detected", "social_stomach_empty"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "collect_and_eat_step",
+            "name": "CollectAndEat",
+            "stepName": "collect_and_eat",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "id": "enhanced_return_sequence",
+        "name": "EnhancedReturnSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_return_conditions",
+            "name": "CheckReturnConditions",
+            "triggers": ["social_stomach_full", "outside_nest"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "enhanced_deposit_trail_step",
+            "name": "EnhancedDepositTrail",
+            "stepName": "deposit_trail_pheromone",
+            "params": {}
+          },
+          {
+            "type": "step",
+            "id": "return_to_nest_step",
+            "name": "ReturnToNest",
+            "stepName": "return_to_nest_advanced",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "id": "hunger_signaling_sequence",
+        "name": "HungerSignalingSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_individual_hungry",
+            "name": "CheckIndividualHungry",
+            "triggers": ["individual_hungry"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "explore_nest_step",
+            "name": "ExploreNest",
+            "stepName": "explore_nest",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "id": "feeding_sequence",
+        "name": "FeedingSequence",
+        "children": [
+          {
+            "type": "condition",
+            "id": "check_can_feed",
+            "name": "CheckCanFeed",
+            "triggers": ["not_social_hungry", "signaling_neighbor_found"],
+            "logic": "AND"
+          },
+          {
+            "type": "step",
+            "id": "feed_neighbor_step",
+            "name": "FeedNeighbor",
+            "stepName": "feed_neighbor",
+            "params": {}
+          }
+        ]
+      },
+      {
+        "type": "step",
+        "id": "default_move_step",
+        "name": "DefaultMove",
+        "stepName": "random_move",
+        "params": {}
+      }
+    ]
+  }
+}

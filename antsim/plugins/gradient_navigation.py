@@ -262,6 +262,7 @@ def pheromone_gradient_available_trigger(blackboard: Any, min_strength: float = 
 def follow_gradient_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
     """
     Move one step towards the pheromone gradient target computed by the sensor.
+    Enhanced with trail success tracking for reinforcement learning.
 
     Returns:
       - SUCCESS if already at target (or no movement needed)
@@ -290,13 +291,22 @@ def follow_gradient_step(worker: Any, environment: Any, **kwargs) -> Dict[str, A
         log.info("step=follow_gradient worker=%s status=blocked pos=%s target=%s type=%s", wid, pos, target, ptype)
         return {"status": "FAILURE"}
 
+    intents = []
+    
+    # Primary move intent
     if MoveIntent is None:
-        intent = {"type": "MOVE", "payload": {"target": [next_pos[0], next_pos[1]]}}
+        move_intent = {"type": "MOVE", "payload": {"target": [next_pos[0], next_pos[1]]}}
     else:
-        intent = MoveIntent(target=next_pos)  # type: ignore
+        move_intent = MoveIntent(target=next_pos)  # type: ignore
+    
+    intents.append(move_intent)
+    
+    # Track that we followed pheromone this turn (for success tracking)
+    track_intent = {"type": "BLACKBOARD_SET", "payload": {"key": "followed_pheromone_last_turn", "value": True}}
+    intents.append(track_intent)
 
     log.info(
-        "step=follow_gradient worker=%s decision pos=%s target=%s next=%s type=%s strength=%.3f",
+        "step=follow_gradient worker=%s decision pos=%s target=%s next=%s type=%s strength=%.3f tracking=TRUE",
         wid, pos, target, next_pos, ptype, float(strength) or 0.0
     )
-    return {"status": "RUNNING", "intents": [intent]}
+    return {"status": "RUNNING", "intents": intents}

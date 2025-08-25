@@ -234,20 +234,30 @@ def return_to_nest_step(worker: Any, environment: Any, **kwargs) -> Dict[str, An
 def deposit_trail_pheromone_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
     """
     Deposit pheromone trail while returning to nest.
+    Enhanced with trail success reinforcement.
     """
     wid = getattr(worker, "id", "?")
     pos = _safe_pos(worker)
+    
+    # Check for trail success multiplier (for reinforcement)
+    success_multiplier = _bb_get(worker, "trail_success_multiplier", 1.0)
+    
+    # Adjust strength based on success
+    base_strength = 10.0
+    strength = base_strength * success_multiplier
+    strength = max(1.0, min(strength, 20.0))  # Clamp between 1-20
     
     # Create pheromone deposition intent
     pheromone_intent = {
         "type": "PHEROMONE",
         "pheromone_type": "food_trail",
-        "strength": 10.0,
+        "strength": strength,
         "position": pos,
         "reason": "food_trail_marking",
     }
     
-    logger.info("step=deposit_trail_pheromone worker=%s status=depositing pos=%s", wid, pos)
+    logger.info("step=deposit_trail_pheromone worker=%s status=depositing pos=%s strength=%.1f multiplier=%.1f", 
+               wid, pos, strength, success_multiplier)
     
     return {
         "status": "SUCCESS",

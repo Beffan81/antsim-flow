@@ -27,10 +27,12 @@ except Exception:
 
 @hookimpl
 def register_steps() -> Dict[str, callable]:
-    """Expose queen-related steps."""
+    """Expose queen-related steps (both for workers interacting with queen and queen-specific behaviors)."""
     return {
         "move_to_queen": move_to_queen_step,
         "feed_queen": feed_queen_step,
+        "signal_hunger": signal_hunger_step,
+        "idle": idle_step,
     }
 
 
@@ -264,3 +266,46 @@ def feed_queen_step(worker: Any, environment: Any, amount: Optional[int] = None,
              wid, qid, pos, qpos, amount)
     # Return SUCCESS to allow sequence to complete; executor applies the intent this tick
     return {"status": "SUCCESS", "intents": [intent]}
+
+
+# ---------- Queen-specific steps ----------
+
+def signal_hunger_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
+    """Queen signals hunger without moving.
+    
+    This step allows the queen to signal her hunger state to nearby workers
+    without any movement. Workers can detect this via their sensors.
+    
+    Returns:
+        SUCCESS: Always succeeds, signaling is passive
+    """
+    qid = getattr(worker, 'id', '?')
+    log.debug("step=signal_hunger queen=%s (passive signaling)", qid)
+    
+    # Set hunger signaling flag on blackboard for workers to detect
+    bb = getattr(worker, 'blackboard', None)  
+    if bb:
+        bb.set('signaling_hunger', True)
+        log.debug("step=signal_hunger queen=%s set signaling_hunger flag", qid)
+    
+    return {"status": "SUCCESS"}
+
+
+def idle_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
+    """Queen remains idle, waiting passively.
+    
+    This is the default queen behavior when not hungry.
+    The queen stays in place and waits.
+    
+    Returns:
+        SUCCESS: Always succeeds
+    """
+    qid = getattr(worker, 'id', '?')
+    log.debug("step=idle queen=%s (no action)", qid)
+    
+    # Ensure signaling_hunger is cleared when idle
+    bb = getattr(worker, 'blackboard', None)
+    if bb:
+        bb.set('signaling_hunger', False)
+    
+    return {"status": "SUCCESS"}

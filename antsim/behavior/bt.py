@@ -344,13 +344,17 @@ class TreeBuilder:
 # ---------- Behavior Engine ----------
 
 class BehaviorEngine:
-    """Runs a BT per worker with sensors pre/post phases and centralized intent execution."""
-    def __init__(self, plugin_manager: PluginManager, tree_root: Node):
+    """Runs a BT per agent with sensors pre/post phases and centralized intent execution.
+    
+    Supports different behavior trees for different agent types (Queen vs Worker).
+    """
+    def __init__(self, plugin_manager: PluginManager, worker_tree_root: Node, queen_tree_root: Node = None):
         self.pm = plugin_manager
         self.sensors = SensorsRunner(plugin_manager)
         self.triggers = TriggersEvaluator(plugin_manager)
         self.executor = IntentExecutor()
-        self.root = tree_root
+        self.worker_root = worker_tree_root
+        self.queen_root = queen_tree_root or worker_tree_root  # Fallback to worker tree if no queen tree
         self._ticks = 0
         self._events = get_event_logger()
 
@@ -365,38 +369,61 @@ class BehaviorEngine:
                 out.append({"key": k, "value": v})
         return out
 
+    def _is_queen(self, agent: Any) -> bool:
+        """Check if agent is a queen based on class name or attributes."""
+        return (getattr(agent, "__class__", type(agent)).__name__ == "Queen" or 
+                hasattr(agent, "egg_laying_interval"))
+    
+    def _get_agent_tree(self, agent: Any) -> Node:
+        """Get appropriate behavior tree for agent type."""
+        return self.queen_root if self._is_queen(agent) else self.worker_root
+
+    def tick_agent(self, agent: Any, environment: Any) -> str:
+        """Tick any agent (queen or worker) with appropriate behavior tree.
+        
+        This is the new universal method that replaces tick_worker.
+        """
+        tree_root = self._get_agent_tree(agent)
+        agent_type = "Queen" if self._is_queen(agent) else "Worker"
+        
+        return self._tick_with_tree(agent, environment, tree_root, agent_type)
+    
     def tick_worker(self, worker: Any, environment: Any) -> str:
+        """Legacy method for backward compatibility - delegates to tick_agent."""
+        return self.tick_agent(worker, environment)
+
+    def _tick_with_tree(self, agent: Any, environment: Any, tree_root: Node, agent_type: str = "Agent") -> str:
         """reset movement -> pre-sensors -> bt.tick (collect intents) -> apply_intents -> post-sensors"""
         self._ticks += 1
         tick_id = self._ticks
-        wid = getattr(worker, "id", "?")
-        log.info("bt_tick start worker=%s tick=%d", wid, tick_id)
+        agent_id = getattr(agent, "id", "?")
+        log.info("bt_tick start %s=%s tick=%d", agent_type.lower(), agent_id, tick_id)
 
         t_total = time.perf_counter()
 
         # Reset per-tick movement and intent log on BB
-        self.executor.reset_worker_cycle(worker)
-        log.debug("bt_tick worker_reset worker=%s tick=%d", wid, tick_id)
+        self.executor.reset_worker_cycle(agent)
+        log.debug("bt_tick agent_reset %s=%s tick=%d", agent_type.lower(), agent_id, tick_id)
 
         # Pre sensors: populate BB facts (idempotent per tick)
         t_pre = time.perf_counter()
-        pre_changes = self.sensors.update_worker(worker, environment)
+        pre_changes = self.sensors.update_worker(agent, environment)
         pre_ms = (time.perf_counter() - t_pre)
         if pre_changes:
-            log.info("bt_tick pre_sensors_changes worker=%s tick=%d keys=%s", wid, tick_id, list(pre_changes.keys()))
+            log.info("bt_tick pre_sensors_changes %s=%s tick=%d keys=%s", agent_type.lower(), agent_id, tick_id, list(pre_changes.keys()))
             if log.isEnabledFor(logging.DEBUG):
                 log.debug(
-                    "bt_tick pre_sensors_diff worker=%s tick=%d diff=%s",
-                    wid, tick_id, self._format_bb_changes(pre_changes)
+                    "bt_tick pre_sensors_diff %s=%s tick=%d diff=%s",
+                    agent_type.lower(), agent_id, tick_id, self._format_bb_changes(pre_changes)
                 )
             # Structured event
-            self._events.log_bb_diff(tick_id, wid, pre_changes, phase="pre_sensors")
+            self._events.log_bb_diff(tick_id, agent_id, pre_changes, phase="pre_sensors")
         else:
-            log.debug("bt_tick pre_sensors_no_changes worker=%s tick=%d", wid, tick_id)
+            log.debug("bt_tick pre_sensors_no_changes %s=%s tick=%d", agent_type.lower(), agent_id, tick_id)
 
         # Build tick context (pass EventLogger)
         ctx = TickContext(
-            worker=worker,
+            worker=agent,
             environment=environment,
             pm=self.pm,
             sensors=self.sensors,
@@ -408,61 +435,65 @@ class BehaviorEngine:
 
         # Run BT
         t_bt = time.perf_counter()
-        result = self.root.tick(ctx)
+        result = tree_root.tick(ctx)
         bt_ms = (time.perf_counter() - t_bt)
 
         # Apply intents via executor before post-sensors
         executed_cnt = rejected_cnt = 0
         t_exec = time.perf_counter()
         if ctx.intents:
-            log.info("bt_tick intents_collected worker=%s tick=%d count=%d", wid, tick_id, len(ctx.intents))
-            exec_summary = self.executor.apply_intents(worker, environment, ctx.intents)
+            log.info("bt_tick intents_collected %s=%s tick=%d count=%d", agent_type.lower(), agent_id, tick_id, len(ctx.intents))
+            exec_summary = self.executor.apply_intents(agent, environment, ctx.intents)
             executed = exec_summary.get("executed", [])
             rejected = exec_summary.get("rejected", [])
             executed_cnt = len(executed)
             rejected_cnt = len(rejected)
-            log.info("bt_tick intents_applied worker=%s tick=%d executed=%d rejected=%d",
-                     wid, tick_id, executed_cnt, rejected_cnt)
+            log.info("bt_tick intents_applied %s=%s tick=%d executed=%d rejected=%d",
+                     agent_type.lower(), agent_id, tick_id, executed_cnt, rejected_cnt)
             # Structured logging per intent
             for e in executed:
                 intent = e.get("intent", {})
-                self._events.log_intent_execution(tick_id, wid, intent.get("type", "UNKNOWN"), "executed", e)
+                self._events.log_intent_execution(tick_id, agent_id, intent.get("type", "UNKNOWN"), "executed", e)
             for r in rejected:
                 intent = r.get("intent", {})
-                self._events.log_intent_execution(tick_id, wid, intent.get("type", "UNKNOWN"), "rejected", r)
+                self._events.log_intent_execution(tick_id, agent_id, intent.get("type", "UNKNOWN"), "rejected", r)
             if rejected_cnt and log.isEnabledFor(logging.DEBUG):
-                log.debug("bt_tick intents_rejected_details worker=%s tick=%d details=%s",
-                          wid, tick_id, rejected)
+                log.debug("bt_tick intents_rejected_details %s=%s tick=%d details=%s",
+                          agent_type.lower(), agent_id, tick_id, rejected)
         else:
-            log.debug("bt_tick no_intents worker=%s tick=%d", wid, tick_id)
+            log.debug("bt_tick no_intents %s=%s tick=%d", agent_type.lower(), agent_id, tick_id)
         exec_ms = (time.perf_counter() - t_exec)
 
         # Post sensors: allow reading results after executor mutations
         t_post = time.perf_counter()
-        post_changes = self.sensors.update_worker(worker, environment)
+        post_changes = self.sensors.update_worker(agent, environment)
         post_ms = (time.perf_counter() - t_post)
         if post_changes:
-            log.info("bt_tick post_sensors_changes worker=%s tick=%d keys=%s", wid, tick_id, list(post_changes.keys()))
+            log.info("bt_tick post_sensors_changes %s=%s tick=%d keys=%s", agent_type.lower(), agent_id, tick_id, list(post_changes.keys()))
             if log.isEnabledFor(logging.DEBUG):
                 log.debug(
-                    "bt_tick post_sensors_diff worker=%s tick=%d diff=%s",
-                    wid, tick_id, self._format_bb_changes(post_changes)
+                    "bt_tick post_sensors_diff %s=%s tick=%d diff=%s",
+                    agent_type.lower(), agent_id, tick_id, self._format_bb_changes(post_changes)
                 )
-            self._events.log_bb_diff(tick_id, wid, post_changes, phase="post_sensors")
+            self._events.log_bb_diff(tick_id, agent_id, post_changes, phase="post_sensors")
         else:
-            log.debug("bt_tick post_sensors_no_changes worker=%s tick=%d", wid, tick_id)
+            log.debug("bt_tick post_sensors_no_changes %s=%s tick=%d", agent_type.lower(), agent_id, tick_id)
 
         # Optional concise snapshot of key facts
         if log.isEnabledFor(logging.DEBUG):
-            bb = worker.blackboard
+            bb = agent.blackboard
             snapshot_keys = [
                 "position", "in_nest", "at_entry",
                 "individual_stomach", "individual_hungry",
                 "social_stomach", "social_hungry",
                 "food_detected", "food_position", "has_moved"
             ]
+            # Add queen-specific keys if it's a queen
+            if agent_type == "Queen":
+                snapshot_keys.extend(["signaling_hunger", "eggs_laid", "last_egg_tick"])                
+            
             snapshot = {k: bb.get(k) for k in snapshot_keys}
-            log.debug("bt_tick bb_snapshot worker=%s tick=%d snapshot=%s", wid, tick_id, snapshot)
+            log.debug("bt_tick bb_snapshot %s=%s tick=%d snapshot=%s", agent_type.lower(), agent_id, tick_id, snapshot)
 
         total_ms = (time.perf_counter() - t_total)
         # Structured performance summary
@@ -484,8 +515,8 @@ class BehaviorEngine:
         except Exception:
             pass
 
-        log.info("bt_tick end worker=%s tick=%d result=%s path=%s",
-                 wid, tick_id, result, " > ".join(ctx.node_path))
+        log.info("bt_tick end %s=%s tick=%d result=%s path=%s",
+                 agent_type.lower(), agent_id, tick_id, result, " > ".join(ctx.node_path))
         return result
 
 

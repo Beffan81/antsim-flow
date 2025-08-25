@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional, List, Tuple
 
 from ..registry.manager import PluginManager
 from ..behavior.bt import BehaviorEngine
+from ..behavior.queen_behavior import build_queen_behavior_tree
 from ..core.worker import Worker
 from ..core.queen import Queen
 from ..core.agents import AgentFactory
@@ -233,14 +234,18 @@ def run_demo(ticks: int = 100) -> None:
                        getattr(agent, 'id', 'unknown'), e)
 
     # 3) BT aus Config bauen (validiert Step-/Trigger-Namen) und Futterquellen initialisieren
-    root, sim_config = _load_simulation_config(pm, sys.argv)
-    log.info("Behavior Tree erfolgreich aus Config geladen und gebaut")
+    worker_root, sim_config = _load_simulation_config(pm, sys.argv)
+    log.info("Worker Behavior Tree erfolgreich aus Config geladen und gebaut")
+    
+    # Build separate queen behavior tree
+    queen_root = build_queen_behavior_tree(pm)
+    log.info("Queen Behavior Tree erfolgreich erstellt (hart-codiert)")
     
     # Futterquellen initialisieren
     initialize_food_sources(env, sim_config)
 
-    # 4) Engine + Renderer
-    engine = BehaviorEngine(pm, root)
+    # 4) Engine + Renderer - with separate trees for queen and workers
+    engine = BehaviorEngine(pm, worker_root, queen_root)
     renderer = Renderer(cell_size=24, show_grid=False, show_pheromones=True)
     # Fenster initialisieren (tolerant, wenn pygame fehlt)
     log.info("Initialisiere Pygame-Fenster...")
@@ -273,15 +278,12 @@ def run_demo(ticks: int = 100) -> None:
         log.info("---- TICK %d ---- (Colony: %d queens, %d workers)", 
                 t, len(queens), len(workers))
 
-        # BT-Tick for all agents (queens and workers)
+        # BT-Tick for all agents (queens and workers) - using new tick_agent method
         results = []
         for agent in all_agents:
-            if hasattr(engine, 'tick_worker'):
-                result = engine.tick_worker(agent, env)
-            else:
-                # Fallback for older engine versions
-                result = engine.tick(agent, env)
-            results.append((agent.id, type(agent).__name__, result))
+            result = engine.tick_agent(agent, env)
+            agent_type = "Queen" if hasattr(agent, 'egg_laying_interval') else "Worker"
+            results.append((agent.id, agent_type, result))
         
         # Queen egg laying logic
         for queen in queens:

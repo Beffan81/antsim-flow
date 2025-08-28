@@ -185,6 +185,56 @@ def initialize_food_sources(env: Environment, sim_config) -> None:
     log.info("Futterquellen-Initialisierung abgeschlossen: %d Quellen hinzugefügt", count)
 
 
+def collect_dashboard_data(env: Environment, queens: List[Queen], workers: List[Worker]) -> Dict[str, Any]:
+    """Collect all data needed for the dashboard display."""
+    # Calculate total food sources in environment
+    total_food_sources = 0
+    for y in range(env.height):
+        for x in range(env.width):
+            cell = env.grid[y][x]
+            if cell.food is not None:
+                total_food_sources += getattr(cell.food, 'amount', 0)
+    
+    # Calculate total social food across all workers
+    total_social_food = sum(
+        worker.blackboard.get('social_stomach', 0) for worker in workers
+    )
+    
+    # Get queen data (first queen)
+    queen_data = {}
+    if queens:
+        queen = queens[0]
+        queen_data = {
+            'energy': queen.blackboard.get('energy', 0),
+            'max_energy': queen.blackboard.get('max_energy', 100),
+            'individual_stomach': queen.blackboard.get('individual_stomach', 0),
+            'stomach_capacity': queen.blackboard.get('stomach_capacity', 50)
+        }
+    
+    # Get top 5 workers by ID
+    sorted_workers = sorted(workers, key=lambda w: w.id)[:5]
+    top_workers = []
+    for worker in sorted_workers:
+        worker_data = {
+            'id': worker.id,
+            'energy': worker.blackboard.get('energy', 0),
+            'max_energy': worker.blackboard.get('max_energy', 100),
+            'individual_stomach': worker.blackboard.get('individual_stomach', 0),
+            'social_stomach': worker.blackboard.get('social_stomach', 0),
+            'current_step': worker.blackboard.get('current_step', 'idle')
+        }
+        top_workers.append(worker_data)
+    
+    return {
+        'total_food_sources': total_food_sources,
+        'total_social_food': total_social_food,
+        'ant_count': len(workers),
+        'brood_count': len(env.brood_registry),
+        'queen': queen_data,
+        'top_workers': top_workers
+    }
+
+
 def run_demo(ticks: int = 100) -> None:
     """Führt eine kurze Demo der neuen Pipeline aus (BT aus validierter Config) und rendert mit dem neuen Renderer."""
     log = logging.getLogger(__name__)
@@ -247,9 +297,9 @@ def run_demo(ticks: int = 100) -> None:
     # 4) Engine + Renderer - with separate trees for queen and workers
     engine = BehaviorEngine(pm, worker_root, queen_root)
     renderer = Renderer(cell_size=24, show_grid=False, show_pheromones=True)
-    # Fenster initialisieren (tolerant, wenn pygame fehlt)
-    log.info("Initialisiere Pygame-Fenster...")
-    renderer.init_window(env.width, env.height, dashboard_width=0, title="antsim new core")
+    # Fenster initialisieren mit Dashboard (300px breit)
+    log.info("Initialisiere Pygame-Fenster mit Dashboard...")
+    renderer.init_window(env.width, env.height, dashboard_width=300, title="antsim new core")
     
     # Check if renderer actually initialized properly
     if not hasattr(renderer, '_screen') or renderer._screen is None:
@@ -384,6 +434,9 @@ def run_demo(ticks: int = 100) -> None:
         if ph_summary:
             log.info("pheromones_tick_summary tick=%d types=%d", t, len(ph_summary))
 
+        # Collect dashboard data for real-time display
+        dashboard_data = collect_dashboard_data(env, queens, workers)
+        
         # Rendering (nutzt ausschließlich neue Core-Daten)
         info_overlay = {
             "tick": t, 
@@ -392,7 +445,8 @@ def run_demo(ticks: int = 100) -> None:
             "brood": len(env.brood_registry),
             "results": results,
             "nest_center": nest_center,
-            "entry": (entry_x, entry_y)
+            "entry": (entry_x, entry_y),
+            "dashboard": dashboard_data
         }
         try:
             renderer.draw(

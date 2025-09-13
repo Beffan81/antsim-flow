@@ -168,15 +168,12 @@ def bb_neighbors_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
 
 def _find_collection_position(worker_pos: Tuple[int, int], food_pos: Tuple[int, int], 
                             environment: Any) -> Optional[List[int]]:
-    """Find best adjacent position to collect food from (pure)."""
     wx, wy = worker_pos
     fx, fy = food_pos
     
-    # If already adjacent, use current position
     if max(abs(wx - fx), abs(wy - fy)) <= 1:
         return [wx, wy]
     
-    # Find all valid adjacent positions to food
     candidates = []
     for dx in (-1, 0, 1):
         for dy in (-1, 0, 1):
@@ -190,12 +187,10 @@ def _find_collection_position(worker_pos: Tuple[int, int], food_pos: Tuple[int, 
                 candidates.append({"pos": [adj_x, adj_y], "dist": dist})
     
     if candidates:
-        # Sort by distance to worker
         candidates.sort(key=lambda c: c["dist"])
         return candidates[0]["pos"]
     
-    # If no free adjacent positions, return food position itself
-    return [fx, fy]
+    return None
 
 
 def _cell_free_for_collection(env: Any, x: int, y: int) -> bool:

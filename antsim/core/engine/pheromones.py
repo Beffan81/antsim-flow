@@ -39,14 +39,37 @@ class PheromoneField:
     width: int
     height: int
     types: List[str] = field(default_factory=list)
-    evaporation: float = 0.01  # fraction per tick [0..1)
-    alpha: float = 0.1         # diffusion weight to 4-neighbors
+    evaporation: float = 0.01  # fraction per tick [0..1) - now configurable
+    alpha: float = 0.1         # diffusion weight to 4-neighbors - now configurable
     allow_dynamic_types: bool = True
 
     # internals
     _front: Dict[str, np.ndarray] = field(init=False, default_factory=dict)  # read buffer
     _back: Dict[str, np.ndarray] = field(init=False, default_factory=dict)   # write buffer (next)
     _deposits: Dict[str, np.ndarray] = field(init=False, default_factory=dict)  # staging for deposit
+
+    @classmethod
+    def from_config(cls, width: int, height: int, pheromone_config=None):
+        """Create PheromoneField from configuration."""
+        if pheromone_config:
+            return cls(
+                width=width,
+                height=height,
+                types=pheromone_config.types or [],
+                evaporation=pheromone_config.evaporation_rate,
+                alpha=pheromone_config.diffusion_alpha,
+                allow_dynamic_types=pheromone_config.allow_dynamic_types
+            )
+        else:
+            # Use defaults
+            return cls(
+                width=width,
+                height=height,
+                types=["trail", "hunger", "alarm"],
+                evaporation=0.01,
+                alpha=0.1,
+                allow_dynamic_types=True
+            )
 
     def __post_init__(self) -> None:
         w, h = _ensure_2d(self.width, self.height)

@@ -87,6 +87,53 @@ class BroodConfig(BaseModel):
     hunger_pheromone_strength: int = Field(2, ge=1, description="Strength of hunger pheromone signal")
 
 
+class EmergentBehaviorConfig(BaseModel):
+    """Configuration for emergent behavior parameters."""
+    hunger_pheromone_detection_range: int = Field(3, ge=1, description="Detection range for hunger pheromones")
+    trail_success_multiplier: float = Field(2.0, gt=0, description="Trail reinforcement factor on success")
+    trail_failure_multiplier: float = Field(0.5, gt=0, description="Trail weakening factor on failure")
+    hunger_detection_threshold: float = Field(1.1, gt=0, description="Hunger detection threshold ratio")
+    direct_feeding_range: int = Field(1, ge=1, description="Range for direct feeding (8-neighborhood)")
+
+
+class PheromoneConfig(BaseModel):
+    """Configuration for pheromone system parameters."""
+    evaporation_rate: float = Field(0.01, ge=0.0, lt=1.0, description="Pheromone evaporation rate per tick")
+    diffusion_alpha: float = Field(0.1, ge=0.0, le=0.25, description="Diffusion weight to 4-neighbors")
+    types: List[str] = Field(default_factory=lambda: ["trail", "hunger", "alarm"], description="Available pheromone types")
+    allow_dynamic_types: bool = Field(True, description="Allow creating new pheromone types at runtime")
+
+
+class SimulationTimingConfig(BaseModel):
+    """Configuration for simulation timing and execution parameters."""
+    max_cycles: int = Field(1000, ge=1, description="Maximum number of simulation cycles")
+    tick_interval_ms: int = Field(100, ge=1, description="Milliseconds between simulation ticks")
+    dashboard_update_frequency: int = Field(3, ge=1, description="Update dashboard every N ticks")
+
+
+class ColonyConfig(BaseModel):
+    """Configuration for initial colony setup."""
+    queen_count: int = Field(1, ge=1, description="Number of queens in initial colony")
+    worker_count: int = Field(5, ge=0, description="Number of workers in initial colony")
+    entry_positions: List[Tuple[int, int]] = Field(
+        default_factory=lambda: [(10, 10), (11, 10), (10, 11)],
+        description="Entry positions for initial colony placement"
+    )
+
+
+class DefaultFoodSourcesConfig(BaseModel):
+    """Configuration for default food sources."""
+    enabled: bool = Field(True, description="Whether to create default food sources")
+    sources: List[FoodSourceConfig] = Field(
+        default_factory=lambda: [
+            FoodSourceConfig(position=(5, 5), amount=200),
+            FoodSourceConfig(position=(35, 25), amount=150),
+            FoodSourceConfig(position=(20, 5), amount=100)
+        ],
+        description="Default food source configurations"
+    )
+
+
 class AgentConfig(BaseModel):
     """Configuration for both queens and workers."""
     # Legacy support: total agent count (deprecated)
@@ -303,9 +350,16 @@ class SimulationConfig(BaseModel):
     tasks: Optional[List[TaskConfig]] = None
     food_sources: Optional[List[FoodSourceConfig]] = None
     
-    # New energy system configurations
+    # Energy system configurations
     queen_energy: Optional[QueenEnergyConfig] = Field(default_factory=QueenEnergyConfig)
     brood: Optional[BroodConfig] = Field(default_factory=BroodConfig)
+    
+    # New high-priority configurable sections
+    emergent_behavior: Optional[EmergentBehaviorConfig] = Field(default_factory=EmergentBehaviorConfig)
+    pheromones: Optional[PheromoneConfig] = Field(default_factory=PheromoneConfig)
+    simulation: Optional[SimulationTimingConfig] = Field(default_factory=SimulationTimingConfig)
+    colony: Optional[ColonyConfig] = Field(default_factory=ColonyConfig)
+    default_food_sources: Optional[DefaultFoodSourcesConfig] = Field(default_factory=DefaultFoodSourcesConfig)
 
 
 # ---------- Loader-/Validierungsfunktionen ----------

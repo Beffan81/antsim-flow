@@ -40,18 +40,32 @@ from .renderer import Renderer  # NEU: Renderer-Integration (Step 10)
 
 # ----------------- Demo Runner -----------------
 
-def build_demo_colony() -> Tuple[List[Queen], List[Worker]]:
-    """Erstellt eine Kolonie mit 1 Königin und 2 Arbeiterinnen."""
-    factory = AgentFactory()
+def build_demo_colony(config = None) -> Tuple[List[Queen], List[Worker]]:
+    """Erstellt eine Kolonie basierend auf Konfiguration."""
+    # Use configuration if provided, otherwise use defaults
+    if config and hasattr(config, 'colony'):
+        colony_config = config.colony
+        agent_config = config.agent
+        queen_count = colony_config.queen_count if colony_config else 1
+        worker_count = colony_config.worker_count if colony_config else 2
+        entry_positions = colony_config.entry_positions if colony_config else [(1, 1), (1, 2), (2, 1)]
+        
+        # Create factory with agent configurations
+        queen_cfg = agent_config.queen_config if agent_config else None
+        worker_cfg = agent_config.worker_config if agent_config else None
+        factory = AgentFactory(queen_config=queen_cfg, worker_config=worker_cfg)
+    else:
+        # Legacy fallback
+        factory = AgentFactory()
+        entry_positions = [(1, 1), (1, 2), (2, 1)]
+        queen_count = 1
+        worker_count = 2
     
-    # Entry positions for the colony
-    entry_positions = [(1, 1), (1, 2), (2, 1)]
-    
-    # Create initial colony: 1 queen + 2 workers
+    # Create initial colony
     queens, workers = factory.create_initial_colony(
         entry_positions=entry_positions,
-        queen_count=1,
-        worker_count=2
+        queen_count=queen_count,
+        worker_count=worker_count
     )
     
     return queens, workers
@@ -129,11 +143,13 @@ def _load_simulation_config(pm: PluginManager, argv: List[str]):
     """
     Lädt die vollständige Simulation-Konfiguration:
       - aus Datei (YAML/JSON) falls angegeben (CLI/ENV),
-      - sonst aus der eingebauten JSON-Fallback-Config.
+      - sonst aus Default-Konfiguration (config/defaults/simulation_defaults.yaml),
+      - nur als letzte Option aus der eingebauten JSON-Fallback-Config.
     Liefert (root_node, simulation_config) oder beendet mit Fehler bei ungültiger externen Config.
     """
     log = logging.getLogger(__name__)
     cfg_path = _resolve_bt_source(argv)
+    
     if cfg_path:
         log.info("Lade Simulation-Konfiguration aus Datei: %s", cfg_path)
         try:
@@ -143,8 +159,21 @@ def _load_simulation_config(pm: PluginManager, argv: List[str]):
         except Exception as e:
             log.error("Fehler beim Laden/Validieren der Simulation-Konfiguration '%s': %s", cfg_path, e, exc_info=True)
             sys.exit(3)
-    # Fallback: eingebauter Minimal-Tree
-    log.info("Keine externe Simulation-Konfiguration angegeben; nutze Fallback")
+    
+    # Try to load default configuration
+    default_config_path = "config/defaults/simulation_defaults.yaml"
+    try:
+        import os
+        if os.path.exists(default_config_path):
+            log.info("Lade Standard-Konfiguration aus: %s", default_config_path)
+            root, sim_config = load_simulation_config(pm, default_config_path)
+            log.info("Standard-Konfiguration erfolgreich geladen")
+            return root, sim_config
+    except Exception as e:
+        log.warning("Konnte Standard-Konfiguration nicht laden: %s", e)
+    
+    # Final fallback: eingebauter Minimal-Tree
+    log.info("Keine externe oder Standard-Konfiguration verfügbar; nutze eingebauten Fallback")
     root = load_behavior_tree(pm, BT_CONFIG_JSON)
     return root, None
 
@@ -153,8 +182,45 @@ def initialize_food_sources(env: Environment, sim_config) -> None:
     """Initialisiert Futterquellen basierend auf der Konfiguration."""
     log = logging.getLogger(__name__)
     
-    if not sim_config or not sim_config.food_sources:
-        # Standard-Futterquellen wenn keine Konfiguration vorhanden
+    # Prüfe zuerst ob Konfiguration default_food_sources hat
+    if sim_config and hasattr(sim_config, 'default_food_sources') and sim_config.default_food_sources and sim_config.default_food_sources.enabled:
+        # Default food sources aus Konfiguration
+        count = 0
+        for food_config in sim_config.default_food_sources.sources:
+            x, y = food_config.position
+            amount = food_config.amount
+            
+            # Validiere Position
+            if not (0 <= x < env.width and 0 <= y < env.height):
+                log.warning("Default-Futterquelle ignoriert (außerhalb der Grenzen): pos=(%d,%d)", x, y)
+                continue
+                
+            env.add_food(x, y, amount)
+            count += 1
+            log.info("Default-Futterquelle hinzugefügt: pos=(%d,%d) amount=%d", x, y, amount)
+        log.info("Default-Futterquellen initialisiert: %d Quellen", count)
+    
+    # Zusätzliche Futterquellen aus food_sources Konfiguration
+    if sim_config and sim_config.food_sources:
+        count = 0
+        for food_config in sim_config.food_sources:
+            x, y = food_config.position
+            amount = food_config.amount
+            
+            # Validiere Position
+            if not (0 <= x < env.width and 0 <= y < env.height):
+                log.warning("Futterquelle ignoriert (außerhalb der Grenzen): pos=(%d,%d)", x, y)
+                continue
+                
+            env.add_food(x, y, amount)
+            count += 1
+            log.info("Spezifische Futterquelle hinzugefügt: pos=(%d,%d) amount=%d", x, y, amount)
+        
+        log.info("Spezifische Futterquellen hinzugefügt: %d Quellen", count)
+        return
+    
+    # Fallback: Hardcoded default sources wenn gar keine Konfiguration
+    if not sim_config or (not hasattr(sim_config, 'default_food_sources') or not sim_config.default_food_sources or not sim_config.default_food_sources.enabled):
         default_sources = [
             (5, 5, 200),
             (35, 25, 150), 
@@ -164,25 +230,7 @@ def initialize_food_sources(env: Environment, sim_config) -> None:
             # Prüfe ob Position innerhalb der Environment-Grenzen liegt
             if 0 <= x < env.width and 0 <= y < env.height:
                 env.add_food(x, y, amount)
-                log.info("Standard-Futterquelle hinzugefügt: pos=(%d,%d) amount=%d", x, y, amount)
-        return
-    
-    # Futterquellen aus Konfiguration
-    count = 0
-    for food_config in sim_config.food_sources:
-        x, y = food_config.position
-        amount = food_config.amount
-        
-        # Validiere Position
-        if not (0 <= x < env.width and 0 <= y < env.height):
-            log.warning("Futterquelle ignoriert (außerhalb der Grenzen): pos=(%d,%d)", x, y)
-            continue
-            
-        env.add_food(x, y, amount)
-        count += 1
-        log.info("Futterquelle hinzugefügt: pos=(%d,%d) amount=%d", x, y, amount)
-    
-    log.info("Futterquellen-Initialisierung abgeschlossen: %d Quellen hinzugefügt", count)
+                log.info("Fallback-Futterquelle hinzugefügt: pos=(%d,%d) amount=%d", x, y, amount)
 
 
 def collect_dashboard_data(env: Environment, queens: List[Queen], workers: List[Worker]) -> Dict[str, Any]:
@@ -246,23 +294,62 @@ def run_demo(ticks: int = 100) -> None:
     log.info("Plugins geladen: steps=%s triggers=%s sensors=%s",
              pm.list_steps(), pm.list_triggers(), pm.list_sensors())
 
-    # 2) Environment mit Standard-Nest erstellen
-    env = Environment(width=40, height=30)
+    # 2) Load configuration first to get all parameters
+    worker_root, sim_config = _load_simulation_config(pm, sys.argv)
+    log.info("Konfiguration geladen: %s", "aus Datei" if sim_config else "Fallback")
     
-    # Nest-Layout erstellen
+    # Configure emergent behavior with loaded config
+    if sim_config and hasattr(sim_config, 'emergent_behavior'):
+        # Import and configure emergent sensors
+        from ..plugins import emergent_sensors
+        emergent_sensors.set_emergent_config(sim_config.emergent_behavior)
+        log.info("Emergent behavior konfiguriert: %s", sim_config.emergent_behavior)
+
+    # 3) Environment mit konfigurierten Dimensionen erstellen
+    env_config = sim_config.environment if sim_config else None
+    width = env_config.width if env_config else 40
+    height = env_config.height if env_config else 30
+    env = Environment(width=width, height=height)
+    
+    # Configure pheromone field with loaded config
+    if sim_config and hasattr(sim_config, 'pheromones'):
+        env.pheromone_field = PheromoneField.from_config(width, height, sim_config.pheromones)
+        log.info("Pheromone field konfiguriert: evap=%.3f alpha=%.3f types=%s", 
+                sim_config.pheromones.evaporation_rate, 
+                sim_config.pheromones.diffusion_alpha,
+                sim_config.pheromones.types)
+    else:
+        env.pheromone_field = PheromoneField.from_config(width, height, None)
+    
+    # Nest-Layout erstellen (aus Environment-Konfiguration)
     nest_builder = NestBuilder()
-    entry_x, entry_y = nest_builder.build_standard_nest(env, center=True)
-    log.info("Standard nest built with entry at (%d, %d)", entry_x, entry_y)
+    if env_config and hasattr(env_config, 'nest_type'):
+        if env_config.nest_type == "standard":
+            entry_x, entry_y = nest_builder.build_standard_nest(env, center=env_config.center_nest)
+        elif env_config.nest_type == "custom" and env_config.nest_size:
+            # TODO: Implement custom nest building
+            entry_x, entry_y = nest_builder.build_standard_nest(env, center=env_config.center_nest)
+        else:  # nest_type == "none"
+            entry_x, entry_y = width // 2, height // 2
+    else:
+        entry_x, entry_y = nest_builder.build_standard_nest(env, center=True)
     
-    # 3) Colony (1 Queen + 2 Workers) mit korrekter Positionierung
-    queens, workers = build_demo_colony()
+    log.info("Nest built (%s) with entry at (%d, %d)", 
+             env_config.nest_type if env_config else "standard", entry_x, entry_y)
+    
+    # 4) Colony mit konfigurierten Parametern erstellen
+    queens, workers = build_demo_colony(sim_config)
     
     # Queen im Nest-Zentrum platzieren
-    nest_center = nest_builder.get_nest_center(env.width, env.height)
+    nest_center = nest_builder.get_nest_center(width, height)
     queens[0].position = nest_center
     
-    # Workers nahe der Entry platzieren
-    worker_positions = [(entry_x, entry_y + 1), (entry_x + 1, entry_y + 1)]
+    # Workers nahe der Entry platzieren (oder aus Konfiguration)
+    if sim_config and hasattr(sim_config, 'colony') and sim_config.colony.entry_positions:
+        worker_positions = sim_config.colony.entry_positions[:len(workers)]
+    else:
+        worker_positions = [(entry_x, entry_y + 1), (entry_x + 1, entry_y + 1)]
+    
     for i, worker in enumerate(workers):
         if i < len(worker_positions):
             worker.position = worker_positions[i]
@@ -283,18 +370,14 @@ def run_demo(ticks: int = 100) -> None:
             log.warning("Could not register agent id=%s: %s", 
                        getattr(agent, 'id', 'unknown'), e)
 
-    # 3) BT aus Config bauen (validiert Step-/Trigger-Namen) und Futterquellen initialisieren
-    worker_root, sim_config = _load_simulation_config(pm, sys.argv)
-    log.info("Worker Behavior Tree erfolgreich aus Config geladen und gebaut")
-    
     # Build separate queen behavior tree
     queen_root = build_queen_behavior_tree(pm)
-    log.info("Queen Behavior Tree erfolgreich erstellt (hart-codiert)")
+    log.info("Queen Behavior Tree erfolgreich erstellt")
     
-    # Futterquellen initialisieren
+    # Futterquellen initialisieren (aus Konfiguration)
     initialize_food_sources(env, sim_config)
 
-    # 4) Engine + Renderer - with separate trees for queen and workers
+    # 5) Engine + Renderer - with separate trees for queen and workers
     engine = BehaviorEngine(pm, worker_root, queen_root)
     renderer = Renderer(cell_size=24, show_grid=False, show_pheromones=True)
     # Fenster initialisieren mit Dashboard (300px breit)
@@ -310,7 +393,25 @@ def run_demo(ticks: int = 100) -> None:
     else:
         log.info("Pygame-Fenster erfolgreich erstellt, starte Simulation")
 
-    # 5) Tick-Schleife mit konfigurierbarer Geschwindigkeit
+    # 6) Tick-Schleife mit konfigurierten Geschwindigkeiten
+    # Get timing configuration
+    timing_config = sim_config.simulation if sim_config and hasattr(sim_config, 'simulation') else None
+    configured_ticks = timing_config.max_cycles if timing_config else ticks
+    tick_delay_ms = timing_config.tick_interval_ms if timing_config else 100
+    dashboard_update_freq = timing_config.dashboard_update_frequency if timing_config else 3
+    
+    # Convert tick delay to seconds for sleep
+    tick_delay = tick_delay_ms / 1000.0
+    
+    # Override with environment variables if set
+    if "ANTSIM_TICK_DELAY" in os.environ:
+        tick_delay = float(os.environ.get("ANTSIM_TICK_DELAY", str(tick_delay)))
+    
+    window_hold = float(os.environ.get("ANTSIM_WINDOW_HOLD", "5.0"))
+    
+    log.info("Simulation läuft mit %d Ticks, tick_delay=%.3fs, dashboard_update_freq=%d, window_hold=%.2fs", 
+             configured_ticks, tick_delay, dashboard_update_freq, window_hold)
+
     # Optional: Pygame-Events verarbeiten, wenn verfügbar
     try:
         import pygame  # type: ignore
@@ -318,12 +419,7 @@ def run_demo(ticks: int = 100) -> None:
     except Exception:
         _HAS_PYGAME = False
     
-    # Konfigurierbare Delays aus Environment-Variablen
-    tick_delay = float(os.environ.get("ANTSIM_TICK_DELAY", "1.0"))
-    window_hold = float(os.environ.get("ANTSIM_WINDOW_HOLD", "5.0"))
-    log.info("Simulation läuft mit tick_delay=%.2fs, window_hold=%.2fs", tick_delay, window_hold)
-
-    for t in range(1, ticks + 1):
+    for t in range(1, configured_ticks + 1):
         env.cycle_count = t
         log.info("---- TICK %d ---- (Colony: %d queens, %d workers)", 
                 t, len(queens), len(workers))
@@ -434,8 +530,11 @@ def run_demo(ticks: int = 100) -> None:
         if ph_summary:
             log.info("pheromones_tick_summary tick=%d types=%d", t, len(ph_summary))
 
-        # Collect dashboard data for real-time display
-        dashboard_data = collect_dashboard_data(env, queens, workers)
+        # Dashboard-Daten sammeln (mit konfigurierbarer Frequenz)
+        if t % dashboard_update_freq == 0:
+            dashboard_data = collect_dashboard_data(env, queens, workers)
+        else:
+            dashboard_data = None  # Skip dashboard update on non-update ticks
         
         # Rendering (nutzt ausschließlich neue Core-Daten)
         info_overlay = {
@@ -571,10 +670,10 @@ def main():
         enabled_types=None  # None = alle EventType
     )
 
-    # Konfigurierbare Tick-Anzahl aus Environment-Variable
-    ticks = int(os.environ.get("ANTSIM_TICKS", "10000"))
-    log.info("Simulation startet mit %d Ticks (konfigurierbar via ANTSIM_TICKS)", ticks)
-    run_demo(ticks=ticks)
+    # Konfigurierbare Tick-Anzahl aus Environment-Variable (kann durch Config überschrieben werden)
+    default_ticks = int(os.environ.get("ANTSIM_TICKS", "1000"))
+    log.info("Simulation startet mit bis zu %d Ticks (konfigurierbar via ANTSIM_TICKS oder Config-Datei)", default_ticks)
+    run_demo(ticks=default_ticks)
 
 
 if __name__ == "__main__":

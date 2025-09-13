@@ -1,0 +1,92 @@
+# Test configuration to verify all new parameters work
+environment:
+  width: 50
+  height: 40
+  nest_type: "standard"
+  center_nest: true
+
+agent:
+  queen_count: 1
+  worker_count: 8
+  queen_config:
+    energy: 250
+    max_energy: 250
+    social_stomach: 200
+    social_stomach_capacity: 200
+    egg_laying_interval: 8
+    max_eggs: 120
+    hunger_threshold: 80
+  worker_config:
+    energy: 120
+    max_energy: 120
+    stomach_capacity: 120
+    social_stomach_capacity: 120
+    hunger_threshold: 60
+
+brood:
+  initial_energy: 60
+  max_energy: 120
+  maturation_time: 40
+  energy_conversion_rate: 6
+  energy_loss_rate: 2
+  stomach_depletion_rate: 4
+  hunger_pheromone_strength: 3
+
+emergent_behavior:
+  hunger_pheromone_detection_range: 5
+  trail_success_multiplier: 2.5
+  trail_failure_multiplier: 0.3
+  hunger_detection_threshold: 1.2
+  direct_feeding_range: 2
+
+pheromones:
+  evaporation_rate: 0.02
+  diffusion_alpha: 0.15
+  types: ["trail", "hunger", "alarm", "home"]
+  allow_dynamic_types: true
+
+simulation:
+  max_cycles: 500
+  tick_interval_ms: 150
+  dashboard_update_frequency: 5
+
+colony:
+  queen_count: 1
+  worker_count: 8
+  entry_positions: [[25, 20], [26, 20], [25, 21], [26, 21], [24, 20], [27, 20], [24, 21], [27, 21]]
+
+default_food_sources:
+  enabled: true
+  sources:
+    - position: [10, 10]
+      amount: 300
+    - position: [40, 30]
+      amount: 250
+    - position: [25, 5]
+      amount: 200
+    - position: [5, 35]
+      amount: 150
+
+behavior_tree:
+  root:
+    type: "selector"
+    name: "TestRoot"
+    children:
+      - type: "sequence"
+        name: "TestForageSequence"
+        children:
+          - type: "condition"
+            name: "TestShouldForage"
+            condition:
+              triggers: ["social_hungry", "not_in_nest"]
+              logic: "AND"
+          - type: "step"
+            name: "TestMove"
+            step:
+              name: "example_move"
+              params: {}
+      - type: "step"
+        name: "TestIdle"
+        step:
+          name: "example_wait"
+          params: {}

@@ -18,6 +18,21 @@ def register_sensors() -> Dict[str, callable]:
     }
 
 
+# Configuration cache for emergent behavior parameters
+_emergent_config = None
+
+def set_emergent_config(config):
+    """Set emergent behavior configuration parameters."""
+    global _emergent_config
+    _emergent_config = config
+
+def _get_config_value(key: str, default):
+    """Get configuration value or return default."""
+    if _emergent_config and hasattr(_emergent_config, key):
+        return getattr(_emergent_config, key)
+    return default
+
+
 def _bb_get(obj: Any, key: str, default=None):
     """Safe getter for blackboard or worker attributes."""
     bb = getattr(obj, "blackboard", None)
@@ -46,6 +61,17 @@ def _neighbors8(x: int, y: int) -> List[Tuple[int, int]]:
     ]
 
 
+def _get_neighbors_in_range(x: int, y: int, range_val: int) -> List[Tuple[int, int]]:
+    """Get all neighbor positions within a given range."""
+    neighbors = []
+    for dx in range(-range_val, range_val + 1):
+        for dy in range(-range_val, range_val + 1):
+            if dx == 0 and dy == 0:
+                continue  # Skip center
+            neighbors.append((x + dx, y + dy))
+    return neighbors
+
+
 def _env_has_lookup(env: Any) -> bool:
     """Check if environment supports position lookups."""
     return hasattr(env, "get_ant_at_position") and hasattr(env, "width") and hasattr(env, "height")
@@ -69,9 +95,13 @@ def direct_feeding_opportunity_sensor(worker: Any, environment: Any, **kwargs) -
     # Check neighbors for hunger
     x, y = _bb_pos(worker)
     hungriest_neighbor = None
-    best_hunger_ratio = 1.1  # Start above max ratio
+    best_hunger_ratio = _get_config_value('hunger_detection_threshold', 1.1)  # Configurable threshold
     
-    for nx, ny in _neighbors8(x, y):
+    # Use configurable feeding range (default 1 = 8-neighborhood)
+    feeding_range = _get_config_value('direct_feeding_range', 1)
+    neighbors = _neighbors8(x, y) if feeding_range == 1 else _get_neighbors_in_range(x, y, feeding_range)
+    
+    for nx, ny in neighbors:
         neighbor = environment.get_ant_at_position(nx, ny)
         if neighbor is None:
             continue
@@ -114,11 +144,11 @@ def track_foraging_success_sensor(worker: Any, environment: Any, **kwargs) -> Di
     if followed_pheromone:
         if found_food and social_stomach > 0:
             # Success: followed pheromone and found food
-            trail_success_multiplier = 2.0
+            trail_success_multiplier = _get_config_value('trail_success_multiplier', 2.0)
             logger.debug("sensor=track_foraging_success worker_id=%s trail_success=HIGH", getattr(worker, "id", "?"))
         else:
             # Failure: followed pheromone but no food found
-            trail_success_multiplier = 0.5
+            trail_success_multiplier = _get_config_value('trail_failure_multiplier', 0.5)
             logger.debug("sensor=track_foraging_success worker_id=%s trail_success=LOW", getattr(worker, "id", "?"))
     else:
         # Normal case: no pheromone following
@@ -144,7 +174,7 @@ def hunger_pheromone_response_sensor(worker: Any, environment: Any, **kwargs) ->
         }
     
     x, y = _bb_pos(worker)
-    max_range = 3  # Detection range for hunger pheromones
+    max_range = _get_config_value('hunger_pheromone_detection_range', 3)  # Configurable detection range
     
     best_position = None
     best_strength = 0

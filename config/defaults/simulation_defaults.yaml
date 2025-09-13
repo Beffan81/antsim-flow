@@ -1,0 +1,114 @@
+# Default Simulation Configuration
+# This file contains all configurable parameters with their default values
+
+# Environment configuration
+environment:
+  width: 40
+  height: 30
+  nest_type: "standard"
+  center_nest: true
+
+# Agent configuration with sensible defaults
+agent:
+  queen_count: 1
+  worker_count: 5
+  queen_config:
+    energy: 200
+    max_energy: 200
+    social_stomach: 150
+    social_stomach_capacity: 150
+    egg_laying_interval: 10
+    max_eggs: 100
+    hunger_threshold: 75
+    energy_conversion_rate: 8
+    energy_loss_rate: 3
+    stomach_depletion_rate: 5
+    hunger_pheromone_strength: 3
+  worker_config:
+    energy: 100
+    max_energy: 100
+    stomach_capacity: 100
+    social_stomach_capacity: 100
+    hunger_threshold: 50
+
+# Brood configuration
+brood:
+  initial_energy: 50
+  max_energy: 100
+  initial_stomach: 0
+  stomach_capacity: 80
+  maturation_time: 50
+  energy_conversion_rate: 5
+  energy_loss_rate: 2
+  stomach_depletion_rate: 3
+  hunger_pheromone_strength: 2
+
+# Queen energy system configuration  
+queen_energy:
+  energy_conversion_rate: 8
+  energy_loss_rate: 3
+  stomach_depletion_rate: 5
+  hunger_pheromone_strength: 3
+
+# Emergent behavior parameters
+emergent_behavior:
+  hunger_pheromone_detection_range: 3
+  trail_success_multiplier: 2.0
+  trail_failure_multiplier: 0.5
+  hunger_detection_threshold: 1.1
+  direct_feeding_range: 1
+
+# Pheromone system configuration
+pheromones:
+  evaporation_rate: 0.01
+  diffusion_alpha: 0.1
+  types: ["trail", "hunger", "alarm"]
+  allow_dynamic_types: true
+
+# Simulation timing configuration
+simulation:
+  max_cycles: 1000
+  tick_interval_ms: 100
+  dashboard_update_frequency: 3
+
+# Colony setup configuration
+colony:
+  queen_count: 1
+  worker_count: 5
+  entry_positions: [[10, 10], [11, 10], [10, 11]]
+
+# Default food sources
+default_food_sources:
+  enabled: true
+  sources:
+    - position: [5, 5]
+      amount: 200
+    - position: [35, 25]
+      amount: 150
+    - position: [20, 5]
+      amount: 100
+
+# Default behavior tree - simple foraging behavior
+behavior_tree:
+  root:
+    type: "selector"
+    name: "Root"
+    children:
+      - type: "sequence"
+        name: "ForageSequence"
+        children:
+          - type: "condition"
+            name: "ShouldForage"
+            condition:
+              triggers: ["social_hungry", "not_in_nest"]
+              logic: "AND"
+          - type: "step"
+            name: "Move"
+            step:
+              name: "example_move"
+              params: {}
+      - type: "step"
+        name: "Idle"
+        step:
+          name: "example_wait"
+          params: {}

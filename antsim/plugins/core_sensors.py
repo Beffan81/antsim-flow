@@ -308,14 +308,6 @@ def bb_pheromone_detection_sensor(worker: Any, environment: Any) -> Dict[str, An
 
 
 def bb_internal_state_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
-    """
-    Derives internal state purely from worker/blackboard without side effects:
-    - energy, max_energy
-    - individual/social stomach and capacities
-    - hunger_threshold
-    - derived booleans: individual_hungry, social_hungry
-    - NEW: search_unsuccessful flag based on recent movement
-    """
     bb = getattr(worker, "blackboard", None)
     def g(k, default=None):
         return bb.get(k, default) if bb else getattr(worker, k, default)
@@ -331,15 +323,20 @@ def bb_internal_state_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
     individual_hungry = bool(indiv < thr)
     social_hungry = bool(social == 0)
     
-    # NEW: Derive search_unsuccessful from movement pattern
-    # This is a simplified heuristic - can be enhanced with actual movement tracking
-    has_moved = g("has_moved", False)
     food_detected = g("food_detected", False)
-    search_unsuccessful = not has_moved and not food_detected
-    
-    # NEW: Derive signaling_hunger from individual_hungry AND in_nest
     in_nest = g("in_nest", False)
     signaling_hunger = individual_hungry and in_nest
+
+    search_threshold = 50
+    search_counter = g("search_counter", 0)
+    is_searching = social_hungry and not in_nest and not food_detected
+
+    if is_searching:
+        search_counter += 1
+    else:
+        search_counter = 0
+
+    search_unsuccessful = search_counter > search_threshold
 
     out = {
         "energy": int(energy),
@@ -351,11 +348,13 @@ def bb_internal_state_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
         "hunger_threshold": int(thr),
         "individual_hungry": individual_hungry,
         "social_hungry": social_hungry,
-        "search_unsuccessful": search_unsuccessful,  # NEW
-        "signaling_hunger": signaling_hunger,  # NEW
+        "search_counter": search_counter,
+        "search_unsuccessful": search_unsuccessful,
+        "signaling_hunger": signaling_hunger,
     }
     logger.debug(
         "sensor=bb_internal_state indiv=%s/%s social=%s/%s threshold=%s hungry_i=%s hungry_s=%s search_fail=%s signaling=%s",
         indiv, indiv_cap, social, social_cap, thr, individual_hungry, social_hungry, search_unsuccessful, signaling_hunger
     )
+    return out
     return out

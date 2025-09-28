@@ -62,8 +62,15 @@ emergent_behavior:
 pheromones:
   evaporation_rate: 0.01
   diffusion_alpha: 0.1
-  types: ["trail", "hunger", "alarm"]
+  types: ["trail", "hunger", "alarm", "breadcrumb"]
   allow_dynamic_types: true
+
+# Navigation system configuration
+navigation:
+  breadcrumb_strength: 2.0
+  breadcrumb_decay: 0.95
+  path_blocked_threshold: 3
+  emergency_center_bias: 0.3
 
 # Simulation timing configuration
 simulation:

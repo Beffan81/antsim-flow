@@ -201,7 +201,8 @@ def collect_and_eat_step(worker: Any, environment: Any, **kwargs) -> Dict[str, A
 
 def return_to_nest_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
     """
-    Return to nest via shortest path.
+    Enhanced return to nest with robust fallback strategies.
+    Prevents workers from getting lost through multi-layered navigation.
     """
     wid = getattr(worker, "id", "?")
     pos = _safe_pos(worker)
@@ -212,18 +213,38 @@ def return_to_nest_step(worker: Any, environment: Any, **kwargs) -> Dict[str, An
         logger.debug("step=return_to_nest worker=%s status=already_in_nest pos=%s", wid, pos)
         return {"status": "SUCCESS"}
     
-    # Get return direction
+    # Get enhanced navigation information
     return_direction = _bb_get(worker, "return_path_direction", None)
+    return_strategy = _bb_get(worker, "return_strategy", "direct")
+    path_blocked = _bb_get(worker, "path_blocked", False)
+    
+    # Multi-level fallback chain
     if not return_direction or (return_direction[0] == 0 and return_direction[1] == 0):
-        logger.debug("step=return_to_nest worker=%s status=no_direction pos=%s", wid, pos)
+        # Try breadcrumb pheromone gradient
+        breadcrumb_direction = _follow_breadcrumb_gradient(worker, environment)
+        if breadcrumb_direction:
+            return_direction = breadcrumb_direction
+            return_strategy = "breadcrumb_gradient"
+        else:
+            # Final fallback: emergency navigation to center
+            return_direction = _emergency_center_navigation(worker, environment)
+            return_strategy = "emergency_center"
+    
+    if not return_direction or (return_direction[0] == 0 and return_direction[1] == 0):
+        logger.warning("step=return_to_nest worker=%s status=all_fallbacks_failed pos=%s", wid, pos)
         return {"status": "FAILURE"}
     
     target_pos = [pos[0] + return_direction[0], pos[1] + return_direction[1]]
     
-    intent = _create_move_intent(target_pos, "returning_to_nest")
+    # Ensure target is within bounds
+    if hasattr(environment, "width") and hasattr(environment, "height"):
+        target_pos[0] = max(0, min(target_pos[0], environment.width - 1))
+        target_pos[1] = max(0, min(target_pos[1], environment.height - 1))
     
-    logger.info("step=return_to_nest worker=%s status=moving pos=%s target=%s direction=%s", 
-               wid, pos, target_pos, return_direction)
+    intent = _create_move_intent(target_pos, f"returning_to_nest_{return_strategy}")
+    
+    logger.info("step=return_to_nest worker=%s status=moving pos=%s target=%s strategy=%s blocked=%s", 
+               wid, pos, target_pos, return_strategy, path_blocked)
     
     return {
         "status": "SUCCESS",
@@ -231,13 +252,69 @@ def return_to_nest_step(worker: Any, environment: Any, **kwargs) -> Dict[str, An
     }
 
 
+def _follow_breadcrumb_gradient(worker: Any, environment: Any) -> Optional[List[int]]:
+    """
+    Follow breadcrumb pheromone gradient back towards nest.
+    Returns direction towards weaker breadcrumb (older = closer to nest).
+    """
+    x, y = _safe_pos(worker)
+    
+    if not hasattr(environment, "pheromone_field"):
+        return None
+    
+    # Check neighboring cells for breadcrumb pheromones
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (-1, 1), (1, -1)]
+    weakest_strength = float('inf')
+    best_direction = None
+    
+    for dx, dy in directions:
+        nx, ny = x + dx, y + dy
+        if (0 <= nx < getattr(environment, "width", 40) and 
+            0 <= ny < getattr(environment, "height", 30)):
+            
+            # Get breadcrumb pheromone strength at this position
+            try:
+                breadcrumb_strength = environment.pheromone_field.get_strength(nx, ny, "breadcrumb")
+                if 0 < breadcrumb_strength < weakest_strength:
+                    weakest_strength = breadcrumb_strength
+                    best_direction = [dx, dy]
+            except (AttributeError, TypeError):
+                continue
+    
+    return best_direction
+
+
+def _emergency_center_navigation(worker: Any, environment: Any) -> List[int]:
+    """
+    Emergency fallback: navigate towards environment center.
+    Last resort when all other navigation methods fail.
+    """
+    x, y = _safe_pos(worker)
+    
+    # Navigate towards environment center
+    center_x = getattr(environment, "width", 40) // 2
+    center_y = getattr(environment, "height", 30) // 2
+    
+    dx = center_x - x
+    dy = center_y - y
+    
+    # Normalize direction
+    if dx != 0:
+        dx = 1 if dx > 0 else -1
+    if dy != 0:
+        dy = 1 if dy > 0 else -1
+    
+    return [dx, dy]
+
+
 def deposit_trail_pheromone_step(worker: Any, environment: Any, **kwargs) -> Dict[str, Any]:
     """
     Deposit pheromone trail while returning to nest.
-    Enhanced with trail success reinforcement.
+    Enhanced with trail success reinforcement and breadcrumb system.
     """
     wid = getattr(worker, "id", "?")
     pos = _safe_pos(worker)
+    bb = getattr(worker, "blackboard", None)
     
     # Check for trail success multiplier (for reinforcement)
     success_multiplier = _bb_get(worker, "trail_success_multiplier", 1.0)
@@ -247,21 +324,44 @@ def deposit_trail_pheromone_step(worker: Any, environment: Any, **kwargs) -> Dic
     strength = base_strength * success_multiplier
     strength = max(1.0, min(strength, 20.0))  # Clamp between 1-20
     
-    # Create pheromone deposition intent
-    pheromone_intent = {
+    # Get or initialize breadcrumb counter for this worker
+    breadcrumb_counter = bb.get("breadcrumb_counter", 0) if bb else 0
+    breadcrumb_counter += 1
+    
+    # Calculate breadcrumb strength (higher counter = later laid = stronger)
+    # This creates a gradient that weakens towards the nest
+    breadcrumb_strength = max(1.0, min(float(breadcrumb_counter) * 0.5, 10.0))
+    
+    # Create multiple pheromone deposition intents
+    intents = []
+    
+    # Main food trail pheromone
+    food_trail_intent = {
         "type": "PHEROMONE",
         "pheromone_type": "food_trail",
         "strength": strength,
         "position": pos,
         "reason": "food_trail_marking",
     }
+    intents.append(food_trail_intent)
     
-    logger.info("step=deposit_trail_pheromone worker=%s status=depositing pos=%s strength=%.1f multiplier=%.1f", 
-               wid, pos, strength, success_multiplier)
+    # Breadcrumb pheromone for navigation fallback
+    breadcrumb_intent = {
+        "type": "PHEROMONE", 
+        "pheromone_type": "breadcrumb",
+        "strength": breadcrumb_strength,
+        "position": pos,
+        "reason": "navigation_breadcrumb",
+    }
+    intents.append(breadcrumb_intent)
+    
+    logger.info("step=deposit_trail_pheromone worker=%s status=depositing pos=%s trail_strength=%.1f breadcrumb_strength=%.1f counter=%d", 
+               wid, pos, strength, breadcrumb_strength, breadcrumb_counter)
     
     return {
         "status": "SUCCESS",
-        "intents": [pheromone_intent],
+        "intents": intents,
+        "breadcrumb_counter": breadcrumb_counter,  # Store updated counter
     }
 
 

@@ -163,10 +163,12 @@ def food_source_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
 
 def nest_distance_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
     """
-    Calculate distances to nest entries and optimal return path.
+    Enhanced nest distance sensor with obstacle detection and fallback strategies.
+    Provides robust return navigation preventing workers from getting lost.
     """
     x, y = _safe_pos(worker)
     entries = _get_nest_entries(environment)
+    bb = getattr(worker, "blackboard", None)
     
     if not entries:
         logger.debug("sensor=nest_distance_sensor reason=no-entries pos=(%s,%s)", x, y)
@@ -174,13 +176,16 @@ def nest_distance_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
             "nearest_entry_distance": 999,
             "nearest_entry_position": None,
             "return_path_direction": None,
+            "return_strategy": "no_entries",
+            "path_blocked": False,
+            "last_valid_direction": None,
         }
     
     # Find nearest entry
     nearest_entry = min(entries, key=lambda e: _manhattan_distance((x, y), e))
     nearest_distance = _manhattan_distance((x, y), nearest_entry)
     
-    # Calculate return direction (simplified - just towards nearest entry)
+    # Calculate primary return direction
     dx = nearest_entry[0] - x
     dy = nearest_entry[1] - y
     
@@ -190,15 +195,91 @@ def nest_distance_sensor(worker: Any, environment: Any) -> Dict[str, Any]:
     if dy != 0:
         dy = 1 if dy > 0 else -1
     
-    return_direction = [dx, dy] if (dx != 0 or dy != 0) else [0, 0]
+    primary_direction = [dx, dy] if (dx != 0 or dy != 0) else [0, 0]
     
-    logger.debug("sensor=nest_distance_sensor pos=(%s,%s) nearest=%s dist=%d dir=%s", 
-                x, y, nearest_entry, nearest_distance, return_direction)
+    # Check if path is blocked (basic obstacle detection)
+    next_x, next_y = x + dx, y + dy
+    path_blocked = False
+    
+    if hasattr(environment, "grid") and hasattr(environment, "width") and hasattr(environment, "height"):
+        if (0 <= next_x < environment.width and 0 <= next_y < environment.height):
+            # Check if next cell is passable
+            if hasattr(environment.grid[next_y][next_x], "terrain"):
+                terrain = getattr(environment.grid[next_y][next_x], "terrain", None)
+                if terrain == "wall":
+                    path_blocked = True
+            # Check if another ant is there
+            if hasattr(environment, "get_ant_at_position"):
+                occupant = environment.get_ant_at_position(next_x, next_y)
+                if occupant is not None:
+                    path_blocked = True
+    
+    # Determine navigation strategy
+    last_valid_direction = bb.get("last_valid_direction", None) if bb else None
+    strategy = "direct"
+    
+    if path_blocked:
+        # Try alternative directions (detour around obstacles)
+        alternative_directions = []
+        if dx != 0 and dy != 0:  # Diagonal movement blocked
+            alternative_directions = [[dx, 0], [0, dy]]  # Try horizontal or vertical
+        elif dx != 0:  # Horizontal movement blocked
+            alternative_directions = [[0, 1], [0, -1]]  # Try vertical
+        elif dy != 0:  # Vertical movement blocked
+            alternative_directions = [[1, 0], [-1, 0]]  # Try horizontal
+        
+        # Test alternative directions
+        valid_alternative = None
+        for alt_dx, alt_dy in alternative_directions:
+            alt_x, alt_y = x + alt_dx, y + alt_dy
+            if (0 <= alt_x < environment.width and 0 <= alt_y < environment.height):
+                alt_blocked = False
+                if hasattr(environment.grid[alt_y][alt_x], "terrain"):
+                    terrain = getattr(environment.grid[alt_y][alt_x], "terrain", None)
+                    if terrain == "wall":
+                        alt_blocked = True
+                if not alt_blocked and hasattr(environment, "get_ant_at_position"):
+                    occupant = environment.get_ant_at_position(alt_x, alt_y)
+                    if occupant is not None:
+                        alt_blocked = True
+                
+                if not alt_blocked:
+                    valid_alternative = [alt_dx, alt_dy]
+                    break
+        
+        if valid_alternative:
+            primary_direction = valid_alternative
+            strategy = "detour"
+        elif last_valid_direction:
+            primary_direction = last_valid_direction
+            strategy = "breadcrumb"
+        else:
+            # Emergency fallback: move towards environment center
+            center_x = getattr(environment, "width", 40) // 2
+            center_y = getattr(environment, "height", 30) // 2
+            center_dx = center_x - x
+            center_dy = center_y - y
+            if center_dx != 0:
+                center_dx = 1 if center_dx > 0 else -1
+            if center_dy != 0:
+                center_dy = 1 if center_dy > 0 else -1
+            primary_direction = [center_dx, center_dy]
+            strategy = "emergency"
+    
+    # Store last valid direction for future use
+    if not path_blocked and primary_direction != [0, 0]:
+        last_valid_direction = primary_direction.copy()
+    
+    logger.debug("sensor=nest_distance_sensor pos=(%s,%s) nearest=%s dist=%d dir=%s strategy=%s blocked=%s", 
+                x, y, nearest_entry, nearest_distance, primary_direction, strategy, path_blocked)
     
     return {
         "nearest_entry_distance": nearest_distance,
         "nearest_entry_position": list(nearest_entry),
-        "return_path_direction": return_direction,
+        "return_path_direction": primary_direction,
+        "return_strategy": strategy,
+        "path_blocked": path_blocked,
+        "last_valid_direction": last_valid_direction,
     }
 
 

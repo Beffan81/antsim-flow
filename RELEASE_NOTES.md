@@ -1,6 +1,137 @@
 # Release Notes
 
-## Version 1.2.0 - Enhanced Foraging & Display Management (Aktuell)
+## Version 1.3.0 - Comprehensive Configuration & Enhanced Navigation (Aktuell)
+
+### 🎉 Neue Features
+- **Umfassendes Konfigurationssystem**: Alle Parameter über YAML konfigurierbar - keine hardcodierten Werte mehr
+- **Robuste Return-to-Nest Navigation**: Multi-Level-Fallback-System verhindert verlorene Arbeiterinnen
+- **Breadcrumb-Pheromone**: Automatisches Trail-System für Navigation bei verlorenem Hauptpfad
+- **Pydantic-Validierung**: Typsichere Konfiguration mit automatischer Fehlerprüfung
+- **Hierarchische Config-Struktur**: Logische Gruppierung aller Parameter (Environment, Agents, Pheromones, Navigation, etc.)
+
+### 🔧 Verbesserungen
+- **Konfigurierbare Emergente Verhaltensweisen**: Trail-Verstärkung, Erkennungsradien, Hunger-Schwellenwerte
+- **Flexible Agent-Defaults**: Queen/Worker-Parameter zentral konfigurierbar
+- **Navigation-Parameter**: Breadcrumb-Stärke, Pfad-Blockierung, Notfall-Strategien einstellbar
+- **Standard-Konfigurationsdatei**: `config/defaults/simulation_defaults.yaml` mit allen Defaults
+- **Erweiterte Pheromone-Typen**: "breadcrumb" für Navigation, "trail" für Futtersuche
+
+### 🐜 Erweiterte Ameisen-Verhaltensweisen
+- **Multi-Strategy Navigation**: 
+  - Primär: Direkter Pfad mit Hinderniserkennung
+  - Fallback: Breadcrumb-Gradient-Verfolgung
+  - Notfall: Emergency Center Navigation
+- **Minimales Gedächtnis**: `last_valid_direction` für robuste Pfadfindung
+- **Intelligente Fallback-Kette**: Kein Verlaufen mehr möglich
+
+### 🛠️ Technische Erweiterungen
+
+#### Neue Konfigurationsstrukturen
+```python
+# In antsim/io/config_loader.py
+EmergentBehaviorConfig     # Trail-Verstärkung, Erkennungsradien
+PheromoneConfig           # Verdunstung, Diffusion, Typen
+NavigationConfig          # Breadcrumb-System, Notfall-Navigation
+SimulationTimingConfig    # Zyklen, Tick-Intervalle, Dashboard-Updates
+ColonyConfig             # Arbeiterinnen-Anzahl, Entry-Positionen
+DefaultFoodSourcesConfig # Standard-Futterquellen-Konfiguration
+```
+
+#### Erweiterte Sensor-/Step-Funktionen
+```python
+# In antsim/plugins/foraging_sensors.py
+nest_distance_sensor       # Multi-Strategy Return-Path-Berechnung
+  - return_strategy: "direct|detour|breadcrumb|emergency"
+  - path_blocked: boolean
+  - last_valid_direction: [dx, dy]
+
+# In antsim/plugins/foraging_steps.py
+return_to_nest_step       # Robuste Navigation mit Fallback-Kette
+  - Breadcrumb-Gradient-Verfolgung
+  - Emergency Center Navigation
+  - Minimales Richtungs-Gedächtnis
+
+deposit_trail_pheromone_step  # Dual-Pheromone-System
+  - "food_trail" für erfolgreiche Futterrouten
+  - "breadcrumb" für Rückweg-Navigation
+```
+
+### 📋 Konfigurationsbeispiele
+
+#### Minimal-Konfiguration (nur Overrides)
+```yaml
+environment:
+  width: 50
+  height: 40
+
+colony:
+  worker_count: 10
+
+emergent_behavior:
+  trail_success_multiplier: 3.0
+```
+
+#### Vollständige Konfiguration
+```yaml
+# Siehe config/defaults/simulation_defaults.yaml für alle Parameter
+# Siehe config/examples/test_new_config.yaml für Anpassungsbeispiele
+```
+
+### 🎯 Migration von v1.2.0 zu v1.3.0
+
+#### Keine Breaking Changes
+- Bestehende Verhaltensweisen funktionieren unverändert
+- Alte YAML-Dateien bleiben kompatibel
+- Fehlende Parameter werden durch Defaults ergänzt
+
+#### Empfohlene Anpassungen
+```bash
+# 1. Eigene Konfiguration aus Defaults erstellen
+cp config/defaults/simulation_defaults.yaml config/my_simulation.yaml
+
+# 2. Parameter anpassen
+# vim config/my_simulation.yaml
+
+# 3. Mit eigener Config testen
+python -m antsim --bt config/my_simulation.yaml
+
+# 4. Validierung
+python run_all_tests.py
+```
+
+#### Neue Möglichkeiten
+- **A/B-Testing**: Verschiedene Trail-Verstärkungsfaktoren vergleichen
+- **Verhaltens-Tuning**: Hunger-Schwellenwerte ohne Code-Änderungen anpassen
+- **Navigation-Optimierung**: Breadcrumb-Parameter für verschiedene Umgebungsgrößen
+
+### 🐛 Bug Fixes
+- ✅ Arbeiterinnen können sich nicht mehr verlaufen (Multi-Level Fallback)
+- ✅ Pfad-Blockierung wird erkannt und umgangen
+- ✅ Notfall-Navigation zur Kartenmitte bei komplettem Verlaufen
+- ✅ Breadcrumb-Pheromone verhindern Kreis-Laufen
+- ✅ Konfigurationsvalidierung erkennt ungültige Parameterwerte
+
+### 📊 Performance-Impact
+- **Configuration Loading**: Einmalig beim Start, vernachlässigbar
+- **Breadcrumb-System**: ~2% zusätzliche Pheromone-Operations
+- **Fallback-Navigation**: Nur bei Bedarf aktiv, minimaler Overhead
+- **Validierung**: Einmalig beim Laden, keine Runtime-Kosten
+
+### 🧪 Testing
+```bash
+# Vollständiger Test mit neuer Konfiguration
+python run_all_tests.py
+
+# Konfigurationssystem testen
+python -m antsim --bt config/examples/test_new_config.yaml
+
+# Navigation-Robustheit validieren
+python test_step2.py  # Verwendet neue Navigation automatisch
+```
+
+---
+
+## Version 1.2.0 - Enhanced Foraging & Display Management
 
 ### 🎉 Neue Features
 - **Comprehensive Foraging Behavior**: Vollständiges Social Foraging System mit intelligenter Nahrungssuche

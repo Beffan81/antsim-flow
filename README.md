@@ -130,6 +130,76 @@ Das Projekt enthält mehrere vorkonfigurierte, komplexe Ameisen-Verhaltenslogike
 4. Simulation testen: `python test_step2.py`
 5. Volltest: `python run_all_tests.py`
 
+## ⚙️ Konfigurationssystem (Neu in v1.3.0)
+
+### Umfassende YAML-basierte Konfiguration
+- **Alle Parameter konfigurierbar**: Keine hardcodierten Werte mehr im Code
+- **Hierarchische Struktur**: Logische Gruppierung (Environment, Agents, Pheromones, Navigation, etc.)
+- **Pydantic-Validierung**: Typsicherheit und automatische Fehlerprüfung
+- **Flexible Defaults**: `config/defaults/simulation_defaults.yaml` für Standardwerte
+
+### Schnellstart mit Konfiguration
+```bash
+# Mit Default-Konfiguration (automatisch geladen)
+python -m antsim
+
+# Mit eigener Konfiguration
+python -m antsim --bt config/examples/test_new_config.yaml
+
+# Via Umgebungsvariable
+export ANTSIM_BT=config/examples/test_new_config.yaml
+python -m antsim
+```
+
+### Konfigurierbare Parameterkategorien
+- **Environment**: Umgebungsmaße, Nesttyp
+- **Colony**: Arbeiterinnen-Anzahl, Startpositionen
+- **Emergent Behavior**: Trail-Verstärkung, Erkennungsradien, Hunger-Schwellenwerte
+- **Pheromones**: Verdunstung, Diffusion, Typen (inkl. "breadcrumb")
+- **Navigation**: Breadcrumb-Stärke, Pfad-Blockierung, Notfall-Navigation
+- **Agent Defaults**: Queen/Worker Energie, Hunger, Social Stomach
+- **Brood**: Reifung, Energieumwandlung
+- **Food Sources**: Standardpositionen und -mengen
+
+Siehe [README_CONFIGURATION.md](README_CONFIGURATION.md) für Details.
+
+## 🧭 Intelligente Navigation (Neu in v1.3.0)
+
+### Robuste Return-to-Nest Navigation
+Arbeiterinnen können sich nicht mehr verlaufen dank Multi-Level-Fallback-System:
+
+**1. Primärstrategie: Direkter Pfad**
+- Berechnung des kürzesten Wegs zum nächsten Nest-Eingang
+- Hinderniserkennung und -umgehung
+
+**2. Fallback: Breadcrumb-Pheromone**
+- Automatisches Legen von Breadcrumb-Trails während der Futtersuche
+- Gradient-Verfolgung zurück zum Nest bei verlorenem Hauptpfad
+
+**3. Notfall: Zentral-Navigation**
+- Emergency-Algorithmus zur Kartenmitte bei komplettem Verlaufen
+- Garantiert dass keine Arbeiterin dauerhaft verloren geht
+
+### Konfigurierbare Navigationsparameter
+```yaml
+navigation:
+  breadcrumb_strength: 2.0        # Stärke der Breadcrumb-Pheromone
+  breadcrumb_decay: 0.95          # Abbaurate pro Tick
+  path_blocked_threshold: 3       # Versuche vor Strategie-Wechsel
+  emergency_center_bias: 0.3      # Tendenz zur Kartenmitte im Notfall
+```
+
+### Navigation-Debugging
+```bash
+# Mit erweiterten Navigations-Logs
+export ANTSIM_LOG_LEVEL=DEBUG
+python -m antsim
+
+# Breadcrumb-Pheromone visualisieren (wenn verfügbar)
+export ANTSIM_SHOW_BREADCRUMBS=true
+python -m antsim
+```
+
 ## 🎮 Display & Rendering
 
 ### **Pygame Display Management** (Neu in v1.2.0)
@@ -162,6 +232,8 @@ python -c "import pygame; pygame.init(); print('OK')"
 - **Frontend**: React, TypeScript, Tailwind CSS, Vite
 - **Backend**: Python, FastAPI, Uvicorn
 - **Simulation**: AntSim Engine mit Plugin-System
+- **Configuration**: YAML mit Pydantic-Validierung (v1.3.0+)
+- **Navigation**: Multi-Level Fallback mit Breadcrumb-System (v1.3.0+)
 - **Rendering**: Pygame mit SDL, Headless-Mode Support
 - **Testing**: unittest, Selenium, Requests
 - **Deployment**: GitHub Codespaces, Docker-ready
@@ -282,6 +354,7 @@ export SDL_VIDEODRIVER=dummy
 
 ## 📚 Weitere Dokumentation
 
+- [Configuration System Guide](README_CONFIGURATION.md) **← NEU in v1.3.0**
 - [Codespace Testing Guide](CODESPACE_TESTING.md)
 - [Step 2 Testing](STEP2_TEST.md)
 - [Release Notes](RELEASE_NOTES.md)
